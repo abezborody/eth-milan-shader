@@ -1,0 +1,51 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #FFF;
+}
+
+canvas {
+  display: block;
+  cursor: default;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  padding: 16px 24px;
+}
+
+.tab {
+  padding: 8px 16px;
+  border: 1px solid #000;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.tab:hover {
+  background: #f0f0f0;
+}
+
+.tab.active {
+  background: #000;
+  color: #fff;
+}
+
+.canvas-container {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 24px 24px;
+}
