@@ -80,7 +80,7 @@ const fragmentShader = `
     vec4 originalColor = texture2D(uTexture, uv);
     
     // Low FPS time - quantize time to 12fps for choppy animation
-    float lowFpsTime = floor(uTime * 12.0) / 12.0;
+    float lowFpsTime = floor(uTime * 14.0) / 14.0;
     
     // Calculate all 3 ripples
     float ripple0 = calcRipple(uv, uClickPos0, uClickTime0, lowFpsTime, uAspect);
@@ -129,15 +129,22 @@ const fragmentShader = `
     vec4 asciiSample = texture2D(uAsciiTexture, vec2(charU, charV));
     float asciiValue = asciiSample.r;
     
-    // Only show ASCII characters where original was dark (the logo)
-    float darkness = step(0.5, 1.0 - luma);
+    // Pixelated darkness from cell-sampled luma (matches ASCII grid exactly)
+    float darkness = smoothstep(0.75, 0.25, luma);
     
-    // White ASCII letters only - no black background
-    // Where there's a letter AND it's in a dark area, show white; otherwise keep original
-    float letterVisible = asciiValue * darkness;
+    // Add extra noise to ASCII characters
+    float charNoise = random(cellCoord + vec2(timeOffset * 0.3)) * 0.3;
+    float noisyAscii = clamp(asciiValue + charNoise - 0.15, 0.0, 1.0);
     
-    // Mix: in ripple area, show white ASCII chars on top of original (no black base)
-    vec3 finalColor = mix(originalColor.rgb, vec3(1.0), letterVisible * totalRipple);
+    // Black ASCII letters on white background
+    float letterVisible = noisyAscii * darkness;
+    float asciiMask = 1.0 - letterVisible;
+    
+    // ASCII result: white where light, black ASCII chars where dark
+    vec3 asciiResult = vec3(mix(1.0, asciiMask, darkness));
+    
+    // In ripple: completely replace original with ASCII result (no original showing through)
+    vec3 finalColor = mix(originalColor.rgb, asciiResult, totalRipple);
     
     gl_FragColor = vec4(finalColor, originalColor.a);
   }
@@ -198,7 +205,7 @@ export class RippleAsciiEffect {
         uTime: { value: 0 },
         uResolution: { value: new THREE.Vector2(this.width, this.height) },
         uAspect: { value: this.width / this.height },
-        uCharSize: { value: 6.0 },
+        uCharSize: { value: 8.0 },
         uCharCount: { value: this.asciiChars.length },
         uClickPos0: { value: new THREE.Vector2(0.5, 0.5) },
         uClickTime0: { value: -10 },
