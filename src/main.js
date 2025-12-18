@@ -2,10 +2,12 @@ import './style.css'
 import { PixelScrambleEffect } from './PixelScrambleEffect.js'
 import { AsciiScrambleEffect } from './AsciiScrambleEffect.js'
 import { RippleClickEffect } from './RippleClickEffect.js'
+import { RippleAsciiEffect } from './RippleAsciiEffect.js'
 
 // Available animation types
 const ANIMATION_TYPES = [
   { id: 'ripple', name: 'Ripple', Effect: RippleClickEffect },
+  { id: 'ripple-ascii', name: 'Ripple ASCII', Effect: RippleAsciiEffect },
   { id: 'scramble', name: 'Scramble', Effect: PixelScrambleEffect },
   { id: 'ascii', name: 'ASCII', Effect: AsciiScrambleEffect },
 ]
