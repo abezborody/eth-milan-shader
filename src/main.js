@@ -3,7 +3,9 @@ import { PixelScrambleEffect } from './PixelScrambleEffect.js'
 import { AsciiScrambleEffect } from './AsciiScrambleEffect.js'
 import { RippleClickEffect } from './RippleClickEffect.js'
 import { RippleAsciiEffect } from './RippleAsciiEffect.js'
+import { RippleAsciiWhiteEffect } from './RippleAsciiWhiteEffect.js'
 import { HoverTrailAsciiEffect } from './HoverTrailAsciiEffect.js'
+import { HoverTrailAsciiWhiteEffect } from './HoverTrailAsciiWhiteEffect.js'
 import { HoverTrailRippleEffect } from './HoverTrailRippleEffect.js'
 import { HoverTrailDisplaceEffect } from './HoverTrailDisplaceEffect.js'
 
@@ -11,7 +13,9 @@ import { HoverTrailDisplaceEffect } from './HoverTrailDisplaceEffect.js'
 const ANIMATION_TYPES = [
   { id: 'ripple', name: 'Ripple', Effect: RippleClickEffect },
   { id: 'ripple-ascii', name: 'Ripple ASCII', Effect: RippleAsciiEffect },
+  { id: 'ripple-ascii-white', name: 'Ripple ASCII White', Effect: RippleAsciiWhiteEffect },
   { id: 'hover-trail', name: 'Hover Trail', Effect: HoverTrailAsciiEffect },
+  { id: 'hover-trail-white', name: 'Hover Trail White', Effect: HoverTrailAsciiWhiteEffect },
   { id: 'hover-trail-ripple', name: 'Hover Dither Trail Ripple', Effect: HoverTrailRippleEffect },
   { id: 'hover-trail-displace', name: 'Hover Trail Displace', Effect: HoverTrailDisplaceEffect },
   { id: 'scramble', name: 'Scramble', Effect: PixelScrambleEffect },
