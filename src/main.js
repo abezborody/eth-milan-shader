@@ -25,6 +25,17 @@ const ANIMATION_TYPES = [
 let currentAnimationType = 'ripple'
 let effects = []
 
+// Get initial animation type from URL search params
+function getInitialAnimationType() {
+  const params = new URLSearchParams(window.location.search)
+  const typeFromUrl = params.get('effect')
+  // Validate that the type exists in our animation types
+  if (typeFromUrl && ANIMATION_TYPES.find(t => t.id === typeFromUrl)) {
+    return typeFromUrl
+  }
+  return 'ripple'
+}
+
 function createTabs() {
   const tabsHtml = ANIMATION_TYPES.map(type => 
     `<button class="tab ${type.id === currentAnimationType ? 'active' : ''}" data-type="${type.id}">${type.name}</button>`
@@ -65,6 +76,11 @@ function switchAnimation(type) {
   
   currentAnimationType = type
   
+  // Update URL search parameter
+  const url = new URL(window.location)
+  url.searchParams.set('effect', type)
+  window.history.replaceState({}, '', url)
+  
   // Update tab styles
   for (const tab of document.querySelectorAll('.tab')) {
     tab.classList.toggle('active', tab.dataset.type === type)
@@ -75,6 +91,9 @@ function switchAnimation(type) {
 }
 
 // Initialize the app
+// Get initial animation type from URL
+currentAnimationType = getInitialAnimationType()
+
 document.querySelector('#app').innerHTML = `
   <div>
     ${createTabs()}
