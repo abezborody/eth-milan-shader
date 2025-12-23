@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hover Trail ASCII Effect Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #fff;
+            font-family: monospace;
+        }
+        #container {
+            width: 800px;
+            height: 600px;
+            margin: 0 auto;
+            border: 1px solid #333;
+        }
+        .info {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">Move your mouse over the image to create a trail effect</div>
+    <div id="container"></div>
+    
+    <script type="module">
+        import { HoverTrailAsciiEffect } from './src/HoverTrailAsciiEffect.js';
+        
+        const container = document.getElementById('container');
+        const effect = new HoverTrailAsciiEffect(
+            container,
+            './public/eth.svg',
+            800,
+            600
+        );
+    </script>
+</body>
+</html>

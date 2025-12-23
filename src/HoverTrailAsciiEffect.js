@@ -9,7 +9,7 @@ const vertexShader = `
   }
 `
 
-// Fragment shader - ripple click triggers inverted ASCII scramble effect over clean SVG
+// Fragment shader - hover trail triggers inverted ASCII scramble effect over clean SVG
 const fragmentShader = `
   uniform sampler2D uTexture;
   uniform sampler2D uAsciiTexture;
@@ -19,13 +19,10 @@ const fragmentShader = `
   uniform float uCharSize;
   uniform int uCharCount;
   
-  // Click ripple uniforms - 3 ripples
-  uniform vec2 uClickPos0;
-  uniform float uClickTime0;
-  uniform vec2 uClickPos1;
-  uniform float uClickTime1;
-  uniform vec2 uClickPos2;
-  uniform float uClickTime2;
+  // Trail uniforms - 20 trail points as vec2 array
+  uniform vec2 uTrailPos[20];
+  uniform float uTrailTime[20];
+  uniform int uTrailCount;
   
   varying vec2 vUv;
   
@@ -34,43 +31,38 @@ const fragmentShader = `
     return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
   }
   
-  // Calculate ripple intensity
-  float calcRipple(vec2 uv, vec2 clickPos, float clickTime, float time, float aspect) {
-    float timeSinceClick = time - clickTime;
+  // Calculate trail intensity with smooth gradient
+  float calcTrail(vec2 uv, vec2 trailPos, float trailTime, float time, float aspect) {
+    float timeSinceTrail = time - trailTime;
     
-    // Ripple parameters
-    float rippleSpeed = 1.2;
-    float rippleWidth = 0.25;
-    float rippleDuration = 1.8;
-    float maxRadius = 1.5;
+    // Trail parameters
+    float trailDuration = 1.5;
+    float maxRadius = 0.8;
+    float minRadius = 0.1;
     
-    // Check if ripple is active
-    float rippleAlive = step(0.0, timeSinceClick) * step(timeSinceClick, rippleDuration);
-    if (rippleAlive < 0.5) return 0.0;
+    // Check if trail point is active
+    float trailAlive = step(0.0, timeSinceTrail) * step(timeSinceTrail, trailDuration);
+    if (trailAlive < 0.5) return 0.0;
     
-    // Aspect-corrected distance from click point
+    // Aspect-corrected distance from trail point
     vec2 aspectCorrectedUV = uv;
     aspectCorrectedUV.x *= aspect;
-    vec2 aspectCorrectedClick = clickPos;
-    aspectCorrectedClick.x *= aspect;
+    vec2 aspectCorrectedTrail = trailPos;
+    aspectCorrectedTrail.x *= aspect;
     
-    float dist = distance(aspectCorrectedUV, aspectCorrectedClick);
+    float dist = distance(aspectCorrectedUV, aspectCorrectedTrail);
     
-    // Current ripple radius
-    float rippleProgress = timeSinceClick / rippleDuration;
-    float currentRadius = rippleProgress * maxRadius * rippleSpeed;
+    // Create smooth gradient trail (stronger at center, fading out)
+    float trailStrength = 1.0 - (timeSinceTrail / trailDuration);
+    float radius = minRadius + (maxRadius - minRadius) * (1.0 - trailStrength);
     
-    // Ripple ring with wider effect zone
-    float ringDist = abs(dist - currentRadius);
-    float ring = smoothstep(rippleWidth, 0.0, ringDist);
+    // Smooth falloff from center
+    float intensity = smoothstep(radius, 0.0, dist);
     
-    // Also affect area inside the ripple (fading trail)
-    float inside = smoothstep(currentRadius, currentRadius * 0.3, dist) * 0.5;
+    // Apply time-based fade
+    float fadeOut = 1.0 - smoothstep(0.0, trailDuration, timeSinceTrail);
     
-    // Fade out over time
-    float fadeOut = 1.0 - smoothstep(0.0, rippleDuration, timeSinceClick);
-    
-    return max(ring, inside) * fadeOut;
+    return intensity * fadeOut;
   }
   
   void main() {
@@ -82,13 +74,16 @@ const fragmentShader = `
     // Low FPS time - quantize time to 12fps for choppy animation
     float lowFpsTime = floor(uTime * 14.0) / 14.0;
     
-    // Calculate all 3 ripples
-    float ripple0 = calcRipple(uv, uClickPos0, uClickTime0, lowFpsTime, uAspect);
-    float ripple1 = calcRipple(uv, uClickPos1, uClickTime1, lowFpsTime, uAspect);
-    float ripple2 = calcRipple(uv, uClickPos2, uClickTime2, lowFpsTime, uAspect);
+    // Calculate all trail points
+    float totalTrail = 0.0;
+    for (int i = 0; i < 20; i++) {
+      if (i >= uTrailCount) break;
+      float trail = calcTrail(uv, uTrailPos[i], uTrailTime[i], lowFpsTime, uAspect);
+      totalTrail += trail;
+    }
     
-    // Combine ripple intensities
-    float totalRipple = clamp(ripple0 + ripple1 + ripple2, 0.0, 1.0);
+    // Clamp total trail intensity
+    totalTrail = clamp(totalTrail, 0.0, 1.0);
     
     // Character cell size (smaller = more chars)
     vec2 charCell = vec2(uCharSize) / uResolution;
@@ -110,8 +105,8 @@ const fragmentShader = `
     // Calculate which ASCII character to use based on inverted luminance (dark areas = dense chars)
     int charIndex = int((1.0 - luma) * float(uCharCount - 1));
     
-    // Add scrambling effect - randomize character selection inside ripple
-    float scrambleAmount = totalRipple * 0.9;
+    // Add scrambling effect - randomize character selection inside trail
+    float scrambleAmount = totalTrail * 0.9;
     float scrambleRand = random(cellCoord + vec2(timeOffset * 0.1));
     
     // Scramble the character index with more chaos
@@ -143,30 +138,39 @@ const fragmentShader = `
     // ASCII result: white where light, black ASCII chars where dark
     vec3 asciiResult = vec3(mix(1.0, asciiMask, darkness));
     
-    // In ripple: completely replace original with ASCII result (no original showing through)
-    vec3 finalColor = mix(originalColor.rgb, asciiResult, totalRipple);
+    // In trail: completely replace original with ASCII result (no original showing through)
+    vec3 finalColor = mix(originalColor.rgb, asciiResult, totalTrail);
     
     gl_FragColor = vec4(finalColor, originalColor.a);
   }
 `
 
-export class RippleAsciiEffect {
+export class HoverTrailAsciiEffect {
   constructor(container, imageSrc, width, height) {
     this.container = container
     this.width = width
     this.height = height
     
-    // Support 3 simultaneous ripples
-    this.ripples = [
-      { pos: new THREE.Vector2(0.5, 0.5), time: -10 },
-      { pos: new THREE.Vector2(0.5, 0.5), time: -10 },
-      { pos: new THREE.Vector2(0.5, 0.5), time: -10 }
-    ]
-    this.nextRippleIndex = 0
+    // Trail system - 20 points for smooth trail
+    this.maxTrailPoints = 20
+    this.trailPoints = []
+    for (let i = 0; i < this.maxTrailPoints; i++) {
+      this.trailPoints.push({
+        pos: new THREE.Vector2(0.5, 0.5),
+        time: -10
+      })
+    }
+    this.trailHead = 0
+    this.trailCount = 0
     
-    // ASCII characters from dark to light (expanded set)
-    // this.asciiChars = ' .,:;!-~=+*?#%$&@XWMB'
-    // this.asciiChars = ' .,:;!#%$&@X10ETHMILAN2025'
+    // Mouse tracking
+    this.mouseX = 0.5
+    this.mouseY = 0.5
+    this.lastMouseX = 0.5
+    this.lastMouseY = 0.5
+    this.isMouseOver = false
+    
+    // ASCII characters from dark to light
     this.asciiChars = ' .,:;!#%$&@X10ETHMILAN'
     
     this.init(imageSrc)
@@ -197,6 +201,14 @@ export class RippleAsciiEffect {
     // Create ASCII character atlas texture
     const asciiTexture = this.createAsciiTexture()
     
+    // Prepare trail uniforms as array of Vector2 objects
+    const trailPosValues = []
+    const trailTimeValues = []
+    for (let i = 0; i < this.maxTrailPoints; i++) {
+      trailPosValues.push(new THREE.Vector2(0.5, 0.5))
+      trailTimeValues.push(-10)
+    }
+    
     // Create material with shaders
     this.material = new THREE.ShaderMaterial({
       vertexShader,
@@ -209,12 +221,9 @@ export class RippleAsciiEffect {
         uAspect: { value: this.width / this.height },
         uCharSize: { value: 8.0 },
         uCharCount: { value: this.asciiChars.length },
-        uClickPos0: { value: new THREE.Vector2(0.5, 0.5) },
-        uClickTime0: { value: -10 },
-        uClickPos1: { value: new THREE.Vector2(0.5, 0.5) },
-        uClickTime1: { value: -10 },
-        uClickPos2: { value: new THREE.Vector2(0.5, 0.5) },
-        uClickTime2: { value: -10 }
+        uTrailPos: { value: trailPosValues },
+        uTrailTime: { value: trailTimeValues },
+        uTrailCount: { value: 0 }
       },
       transparent: true
     })
@@ -223,6 +232,10 @@ export class RippleAsciiEffect {
     const geometry = new THREE.PlaneGeometry(1, 1)
     this.mesh = new THREE.Mesh(geometry, this.material)
     this.scene.add(this.mesh)
+    
+    // Store references to uniform arrays for easy updates
+    this.trailPosUniform = this.material.uniforms.uTrailPos
+    this.trailTimeUniform = this.material.uniforms.uTrailTime
     
     // Add event listeners
     this.addEventListeners()
@@ -291,28 +304,57 @@ export class RippleAsciiEffect {
   addEventListeners() {
     const canvas = this.renderer.domElement
     
-    // Click event to trigger ripple (round-robin through 3 slots)
-    canvas.addEventListener('click', (e) => {
+    // Mouse move event to create trail
+    canvas.addEventListener('mousemove', (e) => {
       const rect = canvas.getBoundingClientRect()
-      const clickX = (e.clientX - rect.left) / rect.width
-      const clickY = 1 - (e.clientY - rect.top) / rect.height
+      this.lastMouseX = this.mouseX
+      this.lastMouseY = this.mouseY
+      this.mouseX = (e.clientX - rect.left) / rect.width
+      this.mouseY = 1 - (e.clientY - rect.top) / rect.height
       
-      // Use next ripple slot
-      const ripple = this.ripples[this.nextRippleIndex]
-      ripple.pos.x = clickX
-      ripple.pos.y = clickY
-      ripple.time = performance.now() * 0.001
+      // Only add trail point if mouse moved enough
+      const moveDist = Math.sqrt(
+        (this.mouseX - this.lastMouseX) ** 2 + 
+        (this.mouseY - this.lastMouseY) ** 2
+      )
       
-      // Update uniform for this ripple
-      this.material.uniforms[`uClickPos${this.nextRippleIndex}`].value.copy(ripple.pos)
-      this.material.uniforms[`uClickTime${this.nextRippleIndex}`].value = ripple.time
-      
-      // Move to next slot (round-robin)
-      this.nextRippleIndex = (this.nextRippleIndex + 1) % 3
+      if (moveDist > 0.01) {
+        this.addTrailPoint(this.mouseX, this.mouseY)
+      }
     })
     
-    // Add cursor pointer to indicate clickable
-    canvas.style.cursor = 'pointer'
+    // Mouse enter/leave events
+    canvas.addEventListener('mouseenter', () => {
+      this.isMouseOver = true
+    })
+    
+    canvas.addEventListener('mouseleave', () => {
+      this.isMouseOver = false
+    })
+    
+    // Add cursor pointer to indicate interactive
+    canvas.style.cursor = 'crosshair'
+  }
+  
+  addTrailPoint(x, y) {
+    // Add new trail point at the head
+    const point = this.trailPoints[this.trailHead]
+    point.pos.x = x
+    point.pos.y = y
+    point.time = performance.now() * 0.001
+    
+    // Update uniforms - use Vector2.set() method
+    this.trailPosUniform.value[this.trailHead].set(x, y)
+    this.trailTimeUniform.value[this.trailHead] = point.time
+    
+    // Move head forward (circular buffer)
+    this.trailHead = (this.trailHead + 1) % this.maxTrailPoints
+    
+    // Update trail count
+    if (this.trailCount < this.maxTrailPoints) {
+      this.trailCount++
+    }
+    this.material.uniforms.uTrailCount.value = this.trailCount
   }
   
   animate() {

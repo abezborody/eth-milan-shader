@@ -3,11 +3,17 @@ import { PixelScrambleEffect } from './PixelScrambleEffect.js'
 import { AsciiScrambleEffect } from './AsciiScrambleEffect.js'
 import { RippleClickEffect } from './RippleClickEffect.js'
 import { RippleAsciiEffect } from './RippleAsciiEffect.js'
+import { HoverTrailAsciiEffect } from './HoverTrailAsciiEffect.js'
+import { HoverTrailRippleEffect } from './HoverTrailRippleEffect.js'
+import { HoverTrailDisplaceEffect } from './HoverTrailDisplaceEffect.js'
 
 // Available animation types
 const ANIMATION_TYPES = [
   { id: 'ripple', name: 'Ripple', Effect: RippleClickEffect },
   { id: 'ripple-ascii', name: 'Ripple ASCII', Effect: RippleAsciiEffect },
+  { id: 'hover-trail', name: 'Hover Trail', Effect: HoverTrailAsciiEffect },
+  { id: 'hover-trail-ripple', name: 'Hover Dither Trail Ripple', Effect: HoverTrailRippleEffect },
+  { id: 'hover-trail-displace', name: 'Hover Trail Displace', Effect: HoverTrailDisplaceEffect },
   { id: 'scramble', name: 'Scramble', Effect: PixelScrambleEffect },
   { id: 'ascii', name: 'ASCII', Effect: AsciiScrambleEffect },
 ]
@@ -29,7 +35,9 @@ function createTabs() {
 
 function initEffects() {
   // Dispose existing effects
-  effects.forEach(effect => effect.dispose())
+  for (const effect of effects) {
+    effect.dispose()
+  }
   effects = []
   
   const ethContainer = document.getElementById('eth-container')
@@ -54,9 +62,9 @@ function switchAnimation(type) {
   currentAnimationType = type
   
   // Update tab styles
-  document.querySelectorAll('.tab').forEach(tab => {
+  for (const tab of document.querySelectorAll('.tab')) {
     tab.classList.toggle('active', tab.dataset.type === type)
-  })
+  }
   
   // Reinitialize effects
   initEffects()
@@ -74,9 +82,9 @@ document.querySelector('#app').innerHTML = `
 `
 
 // Add tab click listeners
-document.querySelectorAll('.tab').forEach(tab => {
+for (const tab of document.querySelectorAll('.tab')) {
   tab.addEventListener('click', () => switchAnimation(tab.dataset.type))
-})
+}
 
 // Initialize effects
 initEffects()
