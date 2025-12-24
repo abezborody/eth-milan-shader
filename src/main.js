@@ -1,25 +1,22 @@
 import './style.css'
-import { PixelScrambleEffect } from './PixelScrambleEffect.js'
-import { AsciiScrambleEffect } from './AsciiScrambleEffect.js'
 import { RippleClickEffect } from './RippleClickEffect.js'
-import { RippleAsciiEffect } from './RippleAsciiEffect.js'
 import { RippleAsciiWhiteEffect } from './RippleAsciiWhiteEffect.js'
-import { HoverTrailAsciiEffect } from './HoverTrailAsciiEffect.js'
 import { HoverTrailAsciiWhiteEffect } from './HoverTrailAsciiWhiteEffect.js'
 import { HoverTrailRippleEffect } from './HoverTrailRippleEffect.js'
-import { HoverTrailDisplaceEffect } from './HoverTrailDisplaceEffect.js'
+
+import { DitheringCopyEffect } from './DitheringCopyEffect.js'
+import { DitheringImageEffect } from './DitheringImageEffect.js'
 
 // Available animation types
 const ANIMATION_TYPES = [
   { id: 'ripple', name: 'Ripple', Effect: RippleClickEffect },
   { id: 'hover-trail-ripple', name: 'Hover Dither Trail Ripple', Effect: HoverTrailRippleEffect },
   { id: 'ripple-ascii-white', name: 'Ripple ASCII White', Effect: RippleAsciiWhiteEffect },
-  { id: 'ripple-ascii', name: 'Ripple ASCII', Effect: RippleAsciiEffect },
-  { id: 'hover-trail', name: 'Hover Trail', Effect: HoverTrailAsciiEffect },
-  { id: 'hover-trail-displace', name: 'Hover Trail Displace', Effect: HoverTrailDisplaceEffect },
   { id: 'hover-trail-white', name: 'Hover Trail White', Effect: HoverTrailAsciiWhiteEffect },
-  // { id: 'scramble', name: 'Scramble', Effect: PixelScrambleEffect },
-  // { id: 'ascii', name: 'ASCII', Effect: AsciiScrambleEffect },
+
+  { id: 'dithering-copy', name: 'Dithering Waves', Effect: DitheringCopyEffect, fullscreen: true },
+  // { id: 'dithering-image', name: 'Dithering Image', Effect: DitheringImageEffect, fullscreen: true },
+  // { id: 'coin-3d', name: '3D Coin', Effect: Coin3DEffect, fullscreen: true },
 ]
 
 let currentAnimationType = 'ripple'
@@ -55,20 +52,55 @@ function initEffects() {
   }
   effects = []
   
-  const ethContainer = document.getElementById('eth-container')
-  const milanContainer = document.getElementById('milan-container')
-  
-  // Clear containers
-  ethContainer.innerHTML = ''
-  milanContainer.innerHTML = ''
-  
   // Get current effect class
   const currentType = ANIMATION_TYPES.find(t => t.id === currentAnimationType)
   const EffectClass = currentType.Effect
+  const isFullscreen = currentType.fullscreen || false
   
-  // Create new effects
-  effects.push(new EffectClass(ethContainer, '/eth.svg', 373, 407))
-  effects.push(new EffectClass(milanContainer, '/milan.svg', 699, 407))
+  // Clear containers
+  const ethContainer = document.getElementById('eth-container')
+  const milanContainer = document.getElementById('milan-container')
+  const canvasContainer = document.querySelector('.canvas-container')
+  
+  ethContainer.innerHTML = ''
+  milanContainer.innerHTML = ''
+  
+  if (isFullscreen) {
+    // Hide individual containers and create full-screen effect
+    ethContainer.style.display = 'none'
+    milanContainer.style.display = 'none'
+    
+    // Create or show full-screen container
+    let fullscreenContainer = document.getElementById('fullscreen-container')
+    if (!fullscreenContainer) {
+      fullscreenContainer = document.createElement('div')
+      fullscreenContainer.id = 'fullscreen-container'
+      fullscreenContainer.style.width = '100%'
+      fullscreenContainer.style.height = '600px'
+      canvasContainer.appendChild(fullscreenContainer)
+    } else {
+      fullscreenContainer.style.display = 'block'
+      fullscreenContainer.innerHTML = '' // Clear previous content
+    }
+    
+    // Create full-screen effect
+    effects.push(new EffectClass(fullscreenContainer, null, window.innerWidth, 600))
+  } else {
+    // Show individual containers and create normal effects
+    ethContainer.style.display = 'block'
+    milanContainer.style.display = 'block'
+    
+    // Hide and clear full-screen container if it exists
+    const fullscreenContainer = document.getElementById('fullscreen-container')
+    if (fullscreenContainer) {
+      fullscreenContainer.style.display = 'none'
+      fullscreenContainer.innerHTML = '' // Clear to prevent orphaned elements
+    }
+    
+    // Create new effects
+    effects.push(new EffectClass(ethContainer, '/eth.svg', 373, 407))
+    effects.push(new EffectClass(milanContainer, '/milan.svg', 699, 407))
+  }
 }
 
 function switchAnimation(type) {

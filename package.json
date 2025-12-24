@@ -12,6 +12,7 @@
     "vite": "^7.2.4"
   },
   "dependencies": {
+    "@paper-design/shaders-react": "^0.0.68",
     "three": "^0.182.0"
   }
 }
