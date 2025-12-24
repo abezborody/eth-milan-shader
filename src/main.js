@@ -12,14 +12,14 @@ import { HoverTrailDisplaceEffect } from './HoverTrailDisplaceEffect.js'
 // Available animation types
 const ANIMATION_TYPES = [
   { id: 'ripple', name: 'Ripple', Effect: RippleClickEffect },
-  { id: 'ripple-ascii', name: 'Ripple ASCII', Effect: RippleAsciiEffect },
-  { id: 'ripple-ascii-white', name: 'Ripple ASCII White', Effect: RippleAsciiWhiteEffect },
-  { id: 'hover-trail', name: 'Hover Trail', Effect: HoverTrailAsciiEffect },
-  { id: 'hover-trail-white', name: 'Hover Trail White', Effect: HoverTrailAsciiWhiteEffect },
   { id: 'hover-trail-ripple', name: 'Hover Dither Trail Ripple', Effect: HoverTrailRippleEffect },
+  { id: 'ripple-ascii-white', name: 'Ripple ASCII White', Effect: RippleAsciiWhiteEffect },
+  { id: 'ripple-ascii', name: 'Ripple ASCII', Effect: RippleAsciiEffect },
+  { id: 'hover-trail', name: 'Hover Trail', Effect: HoverTrailAsciiEffect },
   { id: 'hover-trail-displace', name: 'Hover Trail Displace', Effect: HoverTrailDisplaceEffect },
-  { id: 'scramble', name: 'Scramble', Effect: PixelScrambleEffect },
-  { id: 'ascii', name: 'ASCII', Effect: AsciiScrambleEffect },
+  { id: 'hover-trail-white', name: 'Hover Trail White', Effect: HoverTrailAsciiWhiteEffect },
+  // { id: 'scramble', name: 'Scramble', Effect: PixelScrambleEffect },
+  // { id: 'ascii', name: 'ASCII', Effect: AsciiScrambleEffect },
 ]
 
 let currentAnimationType = 'ripple'
