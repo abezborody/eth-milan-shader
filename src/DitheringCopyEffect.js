@@ -306,7 +306,7 @@ export class DitheringCopyEffect {
     this.colorBack = new THREE.Vector4(0.06, 0.06, 0.06, 1.0) // #FFFFFF
     this.shape = DitheringShapes.simplex
     this.type = DitheringTypes['4x4']
-    this.pxSize = 6
+    this.pxSize = 5
     
     // Animation parameters
     this.time = 0
