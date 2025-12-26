@@ -4,7 +4,7 @@ import { RippleAsciiWhiteEffect } from './RippleAsciiWhiteEffect.js'
 import { HoverTrailAsciiWhiteEffect } from './HoverTrailAsciiWhiteEffect.js'
 import { HoverTrailRippleEffect } from './HoverTrailRippleEffect.js'
 
-import { DitheringCopyEffect } from './DitheringCopyEffect.js'
+import { DitheringEffectSimplex } from './DitheringCopyEffect.js'
 import { DitheringImageEffect } from './DitheringImageEffect.js'
 
 // Available animation types
@@ -14,7 +14,7 @@ const ANIMATION_TYPES = [
   { id: 'ripple-ascii-white', name: 'Ripple ASCII White', Effect: RippleAsciiWhiteEffect },
   { id: 'hover-trail-white', name: 'Hover Trail White', Effect: HoverTrailAsciiWhiteEffect },
 
-  { id: 'dithering-copy', name: 'Dithering Waves', Effect: DitheringCopyEffect, fullscreen: true },
+  { id: 'dithering-copy', name: 'Dithering Waves', Effect: DitheringEffectSimplex, fullscreen: true },
   // { id: 'dithering-image', name: 'Dithering Image', Effect: DitheringImageEffect, fullscreen: true },
   // { id: 'coin-3d', name: '3D Coin', Effect: Coin3DEffect, fullscreen: true },
 ]

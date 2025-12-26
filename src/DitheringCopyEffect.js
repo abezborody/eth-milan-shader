@@ -98,8 +98,8 @@ float snoise(vec2 v) {
 }
 
 float getSimplexNoise(vec2 uv, float t) {
-  float noise = .01 * snoise(uv - vec2(0., .3 * t));
-  noise += .5 * snoise(2. * uv + vec2(0., .32 * t));
+  float noise = .01 * snoise(uv - vec2(0., -.8 * t));
+  noise += .5 * snoise(2. * uv + vec2(0., -.32 * t));
   return noise;
 }
 
@@ -213,6 +213,10 @@ void main() {
     shapeUV *= .001;
     shape = 0.5 + 0.5 * getSimplexNoise(shapeUV, t);
     shape = smoothstep(0.3, 0.9, shape);
+    
+    // Apply gradient mask to reduce effect at top
+    float gradientMask = normalizedUV.y;
+    shape = mix(0.02, shape, -gradientMask);
   } else if (u_shape < 2.5) {
     // Warp
     shapeUV *= .003;
@@ -294,7 +298,7 @@ void main() {
 }
 `
 
-export class DitheringCopyEffect {
+export class DitheringEffectSimplex {
   constructor(container, imageSrc, width, height) {
     this.container = container
     this.width = width
@@ -305,8 +309,8 @@ export class DitheringCopyEffect {
     this.colorFront = new THREE.Vector4(1.0, 1.0, 1.0, 1.0) // #0F0F0F
     this.colorBack = new THREE.Vector4(0.06, 0.06, 0.06, 1.0) // #FFFFFF
     this.shape = DitheringShapes.simplex
-    this.type = DitheringTypes['4x4']
-    this.pxSize = 5
+    this.type = DitheringTypes['8x8']
+    this.pxSize = 2
     
     // Animation parameters
     this.time = 0
