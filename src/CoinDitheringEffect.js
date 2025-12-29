@@ -28,6 +28,94 @@ const vertexShader = `
   }
 `
 
+// Vertex shader for 3D model with lighting
+const modelVertexShader = `
+  varying vec3 vNormal;
+  varying vec3 vPosition;
+  varying vec2 vUv;
+  
+  void main() {
+    vUv = uv;
+    vNormal = normalize(normalMatrix * normal);
+    vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+
+// Fragment shader for 3D model with dithering (reuses background shader logic)
+const modelFragmentShader = `
+  precision mediump float;
+  
+  varying vec3 vNormal;
+  varying vec3 vPosition;
+  varying vec2 vUv;
+  
+  uniform vec3 u_lightPosition;
+  uniform vec3 u_lightColor;
+  uniform float u_lightIntensity;
+  uniform vec3 u_ambientLight;
+  uniform vec2 u_resolution;
+  uniform float u_pxSize;
+  uniform vec4 u_colorBack;
+  uniform vec4 u_colorFront;
+  
+  // 8x8 Bayer matrix (same as background)
+  const int bayer8x8[64] = int[64](
+    0, 32, 8, 40, 2, 34, 10, 42,
+    48, 16, 56, 24, 50, 18, 58, 26,
+    12, 44, 4, 36, 14, 46, 6, 38,
+    60, 28, 52, 20, 62, 30, 54, 22,
+    3, 35, 11, 43, 1, 33, 9, 41,
+    51, 19, 59, 27, 49, 17, 57, 25,
+    15, 47, 7, 39, 13, 45, 5, 37,
+    63, 31, 55, 23, 61, 29, 53, 21
+  );
+  
+  float getBayerValue(vec2 uv, int size) {
+    ivec2 pos = ivec2(fract(uv / float(size)) * float(size));
+    int index = pos.y * size + pos.x;
+    return float(bayer8x8[index]) / 64.0;
+  }
+  
+  void main() {
+    // Calculate lighting
+    vec3 normal = normalize(vNormal);
+    vec3 lightDir = normalize(u_lightPosition - vPosition);
+    
+    // Simple diffuse lighting
+    float diff = max(dot(normal, lightDir), 0.0);
+    
+    // Combine lighting (simplified)
+    float lightValue = u_ambientLight.r + (u_lightIntensity * diff);
+    
+    // Use the same dithering logic as background
+    float pxSize = u_pxSize;
+    vec2 pxSizeUV = gl_FragCoord.xy - 0.5 * u_resolution;
+    pxSizeUV /= pxSize;
+    
+    // Get dithering threshold
+    float dithering = getBayerValue(pxSizeUV, 8);
+    dithering -= 1.2;
+    
+    // Apply dithering to lighting value
+    float res = step(0.5, lightValue + dithering);
+    
+    // Mix colors like background shader
+    vec3 fgColor = u_colorFront.rgb * u_colorFront.a;
+    float fgOpacity = u_colorFront.a;
+    vec3 bgColor = u_colorBack.rgb * u_colorBack.a;
+    float bgOpacity = u_colorBack.a;
+    
+    vec3 color = fgColor * res;
+    float opacity = fgOpacity * res;
+    
+    color += bgColor * (1.0 - opacity);
+    opacity += bgOpacity * (1.0 - opacity);
+    
+    gl_FragColor = vec4(color, opacity);
+  }
+`
+
 // Fragment shader - dithering effect (WebGL1 compatible)
 const ditheringFragmentShader = `precision mediump float;
 
@@ -465,7 +553,8 @@ export class CoinDitheringEffect {
     this.colorBack = new THREE.Vector4(0.06, 0.06, 0.06, 1.0) // #FFFFFF
     this.shape = DitheringShapes.simplex
     this.type = DitheringTypes['8x8']
-    this.pxSize = 2
+    this.bgPxSize = 2  // Dot size for background
+    this.modelPxSize = 3.25  // Dot size for 3D model
     
     // Animation parameters
     this.time = 0
@@ -493,7 +582,8 @@ export class CoinDitheringEffect {
     // Create renderer
     this.renderer = new THREE.WebGLRenderer({ 
       antialias: true, 
-      alpha: true 
+      alpha: true,
+      logarithmicDepthBuffer: true  // Better depth precision
     })
     this.renderer.setSize(this.width, this.height)
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -503,6 +593,9 @@ export class CoinDitheringEffect {
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     
+    // Ensure proper depth testing
+    this.renderer.sortObjects = true
+    
     // Create material with shaders for background
     this.material = new THREE.ShaderMaterial({
       vertexShader,
@@ -511,7 +604,7 @@ export class CoinDitheringEffect {
         u_time: { value: 0 },
         u_resolution: { value: new THREE.Vector2(this.width, this.height) },
         u_pixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
-        u_pxSize: { value: this.pxSize },
+        u_pxSize: { value: this.bgPxSize },
         u_colorBack: { value: this.colorBack },
         u_colorFront: { value: this.colorFront },
         u_shape: { value: this.shape },
@@ -548,24 +641,26 @@ export class CoinDitheringEffect {
   
   setupLights() {
     // Create spotlight for upper part illumination
-    this.spotLight = new THREE.SpotLight(0xffffff, 2)
-    this.spotLight.position.set(0, 0.3, 0.5)
+    this.spotLight = new THREE.SpotLight(0xffffff, 4)
+    this.spotLight.position.set(0, 2, 4)  // Higher and centered above the model
+    this.spotLight.target.position.set(0, 2, 6)  // Point at the model's new position
+    this.scene.add(this.spotLight.target)
     this.spotLight.angle = Math.PI / 3
-    this.spotLight.penumbra = 0.5
-    this.spotLight.decay = 1.5
-    this.spotLight.distance = 1.5
+    this.spotLight.penumbra = 1.5
+    this.spotLight.decay = 1
+    this.spotLight.distance = 5
     this.spotLight.castShadow = true
     this.spotLight.shadow.mapSize.width = 1024
     this.spotLight.shadow.mapSize.height = 1024
     this.scene.add(this.spotLight)
     
     // Add ambient light for subtle base illumination
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)  // Brighter ambient
     this.scene.add(ambientLight)
     
-    // Add directional light from top-left to enhance the spotlight effect
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.4)
-    directionalLight.position.set(-0.2, 0.2, 0.5)
+    // Add directional light from top to enhance the spotlight effect
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)  // Brighter directional
+    directionalLight.position.set(0, 4, 2)  // From above
     directionalLight.castShadow = true
     this.scene.add(directionalLight)
   }
@@ -595,14 +690,13 @@ export class CoinDitheringEffect {
         
         // Scale the model to fit the scene - FBX models are often huge
         const maxDim = Math.max(size.x, size.y, size.z)
-        const targetSize = 1.2  // Target size in world units
+        const targetSize = 1.5  // Target size in world units
         const scale = targetSize / maxDim
         fbx.scale.setScalar(scale)
         
-        console.log('Max dimension:', maxDim, 'Scale factor:', scale)
         
         // Position the model in front of the background plane
-        fbx.position.set(0, 0, 2)  // Centered and closer to camera
+        fbx.position.set(0.66, -0.66, 3)  // Further from background to avoid z-fighting
         
         // Rotate to show the front side better
         fbx.rotation.x = Math.PI * 1.35  // Tilt forward to see face details
@@ -617,44 +711,35 @@ export class CoinDitheringEffect {
         fbx.traverse((child) => {
           if (child.isMesh) {
             meshCount++
-            console.log('Found mesh:', child.name, 'geometry vertices:', child.geometry.attributes.position.count)
-            console.log('Original material:', child.material)
-            console.log('Has texture map:', child.material.map)
             
             // Check if original material has a texture
             const hasTexture = child.material?.map
             
-            if (hasTexture) {
-              // Preserve the texture but use MeshBasicMaterial for visibility
-              child.material = new THREE.MeshBasicMaterial({
-                map: child.material.map,
-                color: 0xffffff,
-                side: THREE.DoubleSide
-              })
-            } else {
-              // Use different colors for logo parts vs main cylinder
-              const isLogoPart = child.name.includes('Fill')
-              const color = isLogoPart ? 0x6366f1 : 0xffffff  // Purple for logo, white for cylinder
-              
-              child.material = new THREE.MeshBasicMaterial({
-                color: color,
-                side: THREE.DoubleSide,
-                wireframe: false
-              })
-            }
+            // Create custom shader material with dithering (using background shader logic)
+            child.material = new THREE.ShaderMaterial({
+              vertexShader: modelVertexShader,
+              fragmentShader: modelFragmentShader,
+              uniforms: {
+                u_lightPosition: { value: new THREE.Vector3(-1, 3, 5) },
+                u_lightColor: { value: new THREE.Color(0xffffff) },
+                u_lightIntensity: { value: 0.43 },
+                u_ambientLight: { value: new THREE.Color(0.4, 0.4, 0.4) },
+                u_resolution: { value: new THREE.Vector2(this.width, this.height) },
+                u_pxSize: { value: this.modelPxSize },  // Independent model dot size
+                u_colorBack: { value: this.colorBack },  // Same as background
+                u_colorFront: { value: this.colorFront }  // Same as background
+              },
+              side: THREE.DoubleSide,
+              transparent: true
+            })
             
             child.castShadow = true
             child.receiveShadow = true
           }
         })
         
-        console.log(`Total meshes found: ${meshCount}`)
-        
         // Add to scene
         this.scene.add(fbx)
-        
-        console.log('FBX model added to scene')
-        console.log('Scene children count:', this.scene.children.length)
       },
       (xhr) => {
         console.log(`${(xhr.loaded / xhr.total * 100)}% loaded`)
@@ -680,9 +765,9 @@ export class CoinDitheringEffect {
     }
     
     // Rotate the FBX model if loaded
-    // if (this.fbxModel) {
-    //   this.fbxModel.rotation.z = this.time * 0.5
-    // }
+    if (this.fbxModel) {
+      this.fbxModel.rotation.z = this.time * 0.2
+    }
     
     this.renderer.render(this.scene, this.camera)
   }
