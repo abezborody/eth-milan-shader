@@ -129,8 +129,12 @@ const fragmentShader = `
     // Sample texture with displaced UVs
     vec4 originalColor = texture2D(uTexture, displacedUV);
     
-    // Get luminance
+    // Get luminance to detect letters (darker areas)
     float luma = dot(originalColor.rgb, vec3(0.299, 0.587, 0.114));
+    
+    // Create mask for letters - areas that are not white background
+    // Letters are darker than white, so we use inverse luminance
+    float letterMask = 1.0 - smoothstep(0.85, 0.95, luma);
     
     // Smaller pixel size for finer dithering
     float pixelSize = 1.5;
@@ -163,8 +167,11 @@ const fragmentShader = `
     // Mix dithered with red tint based on ripple intensity
     vec3 coloredDither = mix(ditheredColor, ditheredColor * rippleColor, 0.7);
     
-    // Mix original with colored dithered based on ripple intensity
-    vec3 finalColor = mix(originalColor.rgb, coloredDither, totalRipple);
+    // Apply letterMask to ripple intensity - ripples only affect letters
+    float maskedRippleIntensity = totalRipple * letterMask;
+    
+    // Mix original with colored dithered based on masked ripple intensity
+    vec3 finalColor = mix(originalColor.rgb, coloredDither, maskedRippleIntensity);
     
     gl_FragColor = vec4(finalColor, originalColor.a);
   }

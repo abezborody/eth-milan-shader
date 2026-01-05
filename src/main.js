@@ -15,8 +15,8 @@ const ANIMATION_TYPES = [
   { id: 'ripple-ascii-white', name: 'Ripple ASCII White', Effect: RippleAsciiWhiteEffect },
   { id: 'hover-trail-white', name: 'Hover Trail White', Effect: HoverTrailAsciiWhiteEffect },
 
-  { id: 'dithering-copy', name: 'Dithering Waves', Effect: DitheringEffectSimplex, fullscreen: true },
   { id: 'dithering-coin', name: 'Dithering Coin', Effect: CoinDitheringEffect, fullscreen: true },
+  { id: 'dithering-copy', name: 'Dithering Waves', Effect: DitheringEffectSimplex, fullscreen: true },
   // { id: 'dithering-image', name: 'Dithering Image', Effect: DitheringImageEffect, fullscreen: true },
 ]
 
