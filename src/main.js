@@ -150,7 +150,7 @@ initEffects()
 // Initialize Rive animation
 async function initRive() {
     const r = new rive.Rive({
-      src: "/public/eth-milan-hero-logo.riv",
+      src: "/eth-milan-hero-logo.riv",
       canvas: document.getElementById("rive"),
       autoplay: true,
       artboard: "eth-logo", // Optional. If not supplied the default is selected
