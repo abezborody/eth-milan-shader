@@ -7,6 +7,7 @@ import { HoverTrailRippleEffect } from './HoverTrailRippleEffect.js'
 import { DitheringEffectSimplex } from './DitheringCopyEffect.js'
 import { DitheringImageEffect } from './DitheringImageEffect.js'
 import { CoinDitheringEffect } from './CoinDitheringEffect.js'
+import * as rive from "@rive-app/canvas";
 
 // Available animation types
 const ANIMATION_TYPES = [
@@ -132,6 +133,7 @@ document.querySelector('#app').innerHTML = `
     ${createTabs()}
     <div class="canvas-container">
       <div id="eth-container"></div>
+      <canvas id="rive" width="258" height="405" style="width: auto; height: 407px; margin-inline: 8px"></canvas>
       <div id="milan-container"></div>
     </div>
   </div>
@@ -144,4 +146,21 @@ for (const tab of document.querySelectorAll('.tab')) {
 
 // Initialize effects
 initEffects()
+
+// Initialize Rive animation
+async function initRive() {
+    const r = new rive.Rive({
+      src: "/public/eth-milan-hero-logo.riv",
+      canvas: document.getElementById("rive"),
+      autoplay: true,
+      artboard: "eth-logo", // Optional. If not supplied the default is selected
+      stateMachines: "State Machine 1", // Optional. Add if needed
+      onLoad: () => {
+        r.resizeDrawingSurfaceToCanvas();
+      },
+    });
+  
+}
+
+initRive()
 

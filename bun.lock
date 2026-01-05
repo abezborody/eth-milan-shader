@@ -6,6 +6,7 @@
       "name": "eth-milan-shader",
       "dependencies": {
         "@paper-design/shaders-react": "^0.0.68",
+        "@rive-app/canvas-lite": "^2.33.1",
         "three": "^0.182.0",
       },
       "devDependencies": {
@@ -69,6 +70,8 @@
     "@paper-design/shaders": ["@paper-design/shaders@0.0.68", "", {}, "sha512-HWDb/mYfIDcwRGYjwTFEoupw4PgdmuoNONJ6TIXBaXWj3zdhS38iNehbAWQxWa1NHtOanOeQkbdG0wvaNKhvEw=="],
 
     "@paper-design/shaders-react": ["@paper-design/shaders-react@0.0.68", "", { "dependencies": { "@paper-design/shaders": "0.0.68" }, "peerDependencies": { "@types/react": "^18 || ^19", "react": "^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-RaL/OCfaPVyVcPHJnemRuobfgseq1Pb5d4ktjclCmKprUe5Ac5WsexFuJBHpIfrMdYC/bV2ADJj24+dnthTpig=="],
+
+    "@rive-app/canvas-lite": ["@rive-app/canvas-lite@2.33.1", "", {}, "sha512-NAGO+pr+2LXtlPsrNL7AhJNqvB46Sc8GP7tg2rY/Pu5Iq/G3C/iEDU0DX0wbVzGNIKysoJNncjSyjyS6R8M5bw=="],
 
     "@rollup/rollup-android-arm-eabi": ["@rollup/rollup-android-arm-eabi@4.53.5", "", { "os": "android", "cpu": "arm" }, "sha512-iDGS/h7D8t7tvZ1t6+WPK04KD0MwzLZrG0se1hzBjSi5fyxlsiggoJHwh18PCFNn7tG43OWb6pdZ6Y+rMlmyNQ=="],
 
