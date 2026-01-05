@@ -7,7 +7,7 @@ import { HoverTrailRippleEffect } from './HoverTrailRippleEffect.js'
 import { DitheringEffectSimplex } from './DitheringCopyEffect.js'
 import { DitheringImageEffect } from './DitheringImageEffect.js'
 import { CoinDitheringEffect } from './CoinDitheringEffect.js'
-import * as rive from "@rive-app/canvas";
+import * as rive from "@rive-app/canvas-lite";
 
 // Available animation types
 const ANIMATION_TYPES = [
