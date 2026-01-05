@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@paper-design/shaders-react": "^0.0.68",
-    "@rive-app/canvas-lite": "^2.33.1",
+    "@rive-app/canvas": "^2.33.1",
     "three": "^0.182.0"
   }
 }
