@@ -58,6 +58,7 @@ const modelFragmentShader = `
   uniform float u_pxSize;
   uniform vec4 u_colorBack;
   uniform vec4 u_colorFront;
+  uniform float u_roughness;
   
   // 8x8 Bayer matrix (same as background)
   const int bayer8x8[64] = int[64](
@@ -71,6 +72,25 @@ const modelFragmentShader = `
     63, 31, 55, 23, 61, 29, 53, 21
   );
   
+  // Random noise function for surface roughness
+  float random(vec2 st) {
+    return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+  }
+  
+  float noise(vec2 st) {
+    vec2 i = floor(st);
+    vec2 f = fract(st);
+    
+    float a = random(i);
+    float b = random(i + vec2(1.0, 0.0));
+    float c = random(i + vec2(0.0, 1.0));
+    float d = random(i + vec2(1.0, 1.0));
+    
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    
+    return mix(a, b, u.x) + (c - a)* u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+  }
+  
   float getBayerValue(vec2 uv, int size) {
     ivec2 pos = ivec2(fract(uv / float(size)) * float(size));
     int index = pos.y * size + pos.x;
@@ -81,6 +101,15 @@ const modelFragmentShader = `
     // Calculate lighting
     vec3 normal = normalize(vNormal);
     vec3 lightDir = normalize(u_lightPosition - vPosition);
+    
+    // Add static surface roughness to normal
+    vec2 roughnessUV = vUv * 80.0;  // Scale for roughness detail
+    float roughnessNoise = noise(roughnessUV) * u_roughness;
+    
+    // Perturb normal with roughness
+    normal.x += roughnessNoise * 0.15;
+    normal.y += roughnessNoise * 0.15;
+    normal = normalize(normal);
     
     // Simple diffuse lighting
     float diff = max(dot(normal, lightDir), 0.0);
@@ -554,7 +583,7 @@ export class CoinDitheringEffect {
     this.shape = DitheringShapes.simplex
     this.type = DitheringTypes['8x8']
     this.bgPxSize = 2  // Dot size for background
-    this.modelPxSize = 3.25  // Dot size for 3D model
+    this.modelPxSize = 4  // Dot size for 3D model
     
     // Animation parameters
     this.time = 0
@@ -727,7 +756,8 @@ export class CoinDitheringEffect {
                 u_resolution: { value: new THREE.Vector2(this.width, this.height) },
                 u_pxSize: { value: this.modelPxSize },  // Independent model dot size
                 u_colorBack: { value: this.colorBack },  // Same as background
-                u_colorFront: { value: this.colorFront }  // Same as background
+                u_colorFront: { value: this.colorFront },  // Same as background
+                u_roughness: { value: 0.5 }  // Static surface roughness amount (0-1)
               },
               side: THREE.DoubleSide,
               transparent: true
@@ -766,7 +796,10 @@ export class CoinDitheringEffect {
     
     // Rotate the FBX model if loaded
     if (this.fbxModel) {
-      this.fbxModel.rotation.z = this.time * 0.2
+      // Oscillate between -25 and +25 degrees
+      const maxRotation = 25 * Math.PI / 180  // 25 degrees in radians
+      const rotationAngle = Math.sin(this.time * 1) * maxRotation
+      this.fbxModel.rotation.z = rotationAngle
     }
     
     this.renderer.render(this.scene, this.camera)
