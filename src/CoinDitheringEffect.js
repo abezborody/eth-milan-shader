@@ -582,8 +582,8 @@ export class CoinDitheringEffect {
     this.colorBack = new THREE.Vector4(0.06, 0.06, 0.06, 1.0) // #FFFFFF
     this.shape = DitheringShapes.simplex
     this.type = DitheringTypes['8x8']
-    this.bgPxSize = 1  // Dot size for background
-    this.modelPxSize = 2.5  // Dot size for 3D model
+    this.bgPxSize = 1.2  // Dot size for background
+    this.modelPxSize = 2.8  // Dot size for 3D model
     
     // Animation parameters
     this.time = 0
