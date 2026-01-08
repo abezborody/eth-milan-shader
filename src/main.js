@@ -1,5 +1,6 @@
 import './style.css'
 import { RippleClickEffect } from './RippleClickEffect.js'
+import { RippleClickEffectV2 } from './RippleClickEffectV2.js'
 import { RippleAsciiWhiteEffect } from './RippleAsciiWhiteEffect.js'
 import { HoverTrailAsciiWhiteEffect } from './HoverTrailAsciiWhiteEffect.js'
 import { HoverTrailRippleEffect } from './HoverTrailRippleEffect.js'
@@ -11,7 +12,8 @@ import * as rive from "@rive-app/canvas";
 
 // Available animation types
 const ANIMATION_TYPES = [
-  { id: 'ripple', name: 'Ripple', Effect: RippleClickEffect },
+  { id: 'ripple', name: 'Ripple', Effect: RippleClickEffect, riveCanvas: true },
+  { id: 'ripple-v2', name: 'Ripple V2', Effect: RippleClickEffectV2, riveCanvas: true },
   { id: 'hover-trail-ripple', name: 'Hover Dither Trail Ripple', Effect: HoverTrailRippleEffect },
   { id: 'ripple-ascii-white', name: 'Ripple ASCII White', Effect: RippleAsciiWhiteEffect },
   { id: 'hover-trail-white', name: 'Hover Trail White', Effect: HoverTrailAsciiWhiteEffect },
@@ -67,10 +69,13 @@ function initEffects() {
   ethContainer.innerHTML = ''
   milanContainer.innerHTML = ''
   
+  const riveCanvas = document.getElementById('rive')
+  
   if (isFullscreen) {
     // Hide individual containers and create full-screen effect
     ethContainer.style.display = 'none'
     milanContainer.style.display = 'none'
+    if (riveCanvas) riveCanvas.style.display = 'none'
     
     // Create or show full-screen container
     let fullscreenContainer = document.getElementById('fullscreen-container')
@@ -91,6 +96,7 @@ function initEffects() {
     // Show individual containers and create normal effects
     ethContainer.style.display = 'block'
     milanContainer.style.display = 'block'
+    if (riveCanvas) riveCanvas.style.display = 'block'
     
     // Hide and clear full-screen container if it exists
     const fullscreenContainer = document.getElementById('fullscreen-container')
@@ -133,7 +139,7 @@ document.querySelector('#app').innerHTML = `
     ${createTabs()}
     <div class="canvas-container">
       <div id="eth-container"></div>
-      <canvas id="rive" width="258" height="405" style="width: auto; height: 407px; margin-inline: 8px"></canvas>
+      <canvas id="rive" width="774" height="1215" style="width: auto; height: 407px; margin-inline: 8px"></canvas>
       <div id="milan-container"></div>
     </div>
   </div>
