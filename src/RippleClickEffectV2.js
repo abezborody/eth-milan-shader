@@ -9,157 +9,174 @@ const vertexShader = `
 `
 
 const fragmentShader = `
+  precision highp float;
+  
   uniform sampler2D uTexture;
   uniform float uTime;
   uniform vec2 uResolution;
-  uniform float uAspect;
+  uniform float uPixelSize;
+  uniform float uScale;
+  uniform float uDensity;
+  uniform float uRippleSpeed;
+  uniform float uRippleThickness;
+  uniform float uRippleIntensity;
   
-  uniform vec2 uClickPos0;
-  uniform float uClickTime0;
-  uniform vec2 uClickPos1;
-  uniform float uClickTime1;
-  uniform vec2 uClickPos2;
-  uniform float uClickTime2;
+  const int MAX_CLICKS = 10;
+  uniform vec2 uClickPos[MAX_CLICKS];
+  uniform float uClickTimes[MAX_CLICKS];
   
   varying vec2 vUv;
   
-  float random(vec2 st) {
-    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+  float Bayer2(vec2 a) {
+    a = floor(a);
+    return fract(a.x / 2. + a.y * a.y * .75);
+  }
+  #define Bayer4(a) (Bayer2(.5*(a))*0.25 + Bayer2(a))
+  #define Bayer8(a) (Bayer4(.5*(a))*0.25 + Bayer2(a))
+  
+  #define FBM_OCTAVES 5
+  #define FBM_LACUNARITY 1.25
+  #define FBM_GAIN 1.0
+  
+  float hash11(float n) { 
+    return fract(sin(n)*43758.5453); 
   }
   
-  float bayer8x8(vec2 pos) {
-    int x = int(mod(pos.x, 8.0));
-    int y = int(mod(pos.y, 8.0));
-    int index = x + y * 8;
-    
-    float matrix[64];
-    matrix[0] = 0.0/64.0;   matrix[1] = 32.0/64.0;  matrix[2] = 8.0/64.0;   matrix[3] = 40.0/64.0;
-    matrix[4] = 2.0/64.0;   matrix[5] = 34.0/64.0;  matrix[6] = 10.0/64.0;  matrix[7] = 42.0/64.0;
-    matrix[8] = 48.0/64.0;  matrix[9] = 16.0/64.0;  matrix[10] = 56.0/64.0; matrix[11] = 24.0/64.0;
-    matrix[12] = 50.0/64.0; matrix[13] = 18.0/64.0; matrix[14] = 58.0/64.0; matrix[15] = 26.0/64.0;
-    matrix[16] = 12.0/64.0; matrix[17] = 44.0/64.0; matrix[18] = 4.0/64.0;  matrix[19] = 36.0/64.0;
-    matrix[20] = 14.0/64.0; matrix[21] = 46.0/64.0; matrix[22] = 6.0/64.0;  matrix[23] = 38.0/64.0;
-    matrix[24] = 60.0/64.0; matrix[25] = 28.0/64.0; matrix[26] = 52.0/64.0; matrix[27] = 20.0/64.0;
-    matrix[28] = 62.0/64.0; matrix[29] = 30.0/64.0; matrix[30] = 54.0/64.0; matrix[31] = 22.0/64.0;
-    matrix[32] = 3.0/64.0;  matrix[33] = 35.0/64.0; matrix[34] = 11.0/64.0; matrix[35] = 43.0/64.0;
-    matrix[36] = 1.0/64.0;  matrix[37] = 33.0/64.0; matrix[38] = 9.0/64.0;  matrix[39] = 41.0/64.0;
-    matrix[40] = 51.0/64.0; matrix[41] = 19.0/64.0; matrix[42] = 59.0/64.0; matrix[43] = 27.0/64.0;
-    matrix[44] = 49.0/64.0; matrix[45] = 17.0/64.0; matrix[46] = 57.0/64.0; matrix[47] = 25.0/64.0;
-    matrix[48] = 15.0/64.0; matrix[49] = 47.0/64.0; matrix[50] = 7.0/64.0;  matrix[51] = 39.0/64.0;
-    matrix[52] = 13.0/64.0; matrix[53] = 45.0/64.0; matrix[54] = 5.0/64.0;  matrix[55] = 37.0/64.0;
-    matrix[56] = 63.0/64.0; matrix[57] = 31.0/64.0; matrix[58] = 55.0/64.0; matrix[59] = 23.0/64.0;
-    matrix[60] = 61.0/64.0; matrix[61] = 29.0/64.0; matrix[62] = 53.0/64.0; matrix[63] = 21.0/64.0;
-    
-    for (int i = 0; i < 64; i++) {
-      if (i == index) return matrix[i];
+  float vnoise(vec3 p) {
+    vec3 ip = floor(p);
+    vec3 fp = fract(p);
+    float n000 = hash11(dot(ip + vec3(0.0,0.0,0.0), vec3(1.0,57.0,113.0)));
+    float n100 = hash11(dot(ip + vec3(1.0,0.0,0.0), vec3(1.0,57.0,113.0)));
+    float n010 = hash11(dot(ip + vec3(0.0,1.0,0.0), vec3(1.0,57.0,113.0)));
+    float n110 = hash11(dot(ip + vec3(1.0,1.0,0.0), vec3(1.0,57.0,113.0)));
+    float n001 = hash11(dot(ip + vec3(0.0,0.0,1.0), vec3(1.0,57.0,113.0)));
+    float n101 = hash11(dot(ip + vec3(1.0,0.0,1.0), vec3(1.0,57.0,113.0)));
+    float n011 = hash11(dot(ip + vec3(0.0,1.0,1.0), vec3(1.0,57.0,113.0)));
+    float n111 = hash11(dot(ip + vec3(1.0,1.0,1.0), vec3(1.0,57.0,113.0)));
+    vec3 w = fp*fp*fp*(fp*(fp*6.0-15.0)+10.0);
+    float x00 = mix(n000, n100, w.x);
+    float x10 = mix(n010, n110, w.x);
+    float x01 = mix(n001, n101, w.x);
+    float x11 = mix(n011, n111, w.x);
+    float y0  = mix(x00, x10, w.y);
+    float y1  = mix(x01, x11, w.y);
+    return mix(y0, y1, w.z) * 2.0 - 1.0;
+  }
+  
+  float fbm2(vec2 uv, float t) {
+    vec3 p = vec3(uv * uScale, t);
+    float amp = 1.0;
+    float freq = 1.0;
+    float sum = 1.0;
+    for (int i = 0; i < FBM_OCTAVES; ++i) {
+      sum  += amp * vnoise(p * freq);
+      freq *= FBM_LACUNARITY;
+      amp  *= FBM_GAIN;
     }
-    return 0.0;
+    return sum * 0.5 + 0.5;
   }
   
-  float calcRipple(vec2 uv, vec2 clickPos, float clickTime, float time, float aspect) {
-    float timeSinceClick = time - clickTime;
-    
-    float rippleSpeed = 1.2;
-    float rippleWidth = 0.3;
-    float rippleDuration = 1.6;
-    float maxRadius = 1.5;
-    
-    float rippleAlive = step(0.0, timeSinceClick) * step(timeSinceClick, rippleDuration);
-    if (rippleAlive < 0.5) return 0.0;
-    
-    vec2 aspectCorrectedUV = uv;
-    aspectCorrectedUV.x *= aspect;
-    vec2 aspectCorrectedClick = clickPos;
-    aspectCorrectedClick.x *= aspect;
-    
-    float dist = distance(aspectCorrectedUV, aspectCorrectedClick);
-    
-    float rippleProgress = timeSinceClick / rippleDuration;
-    float currentRadius = rippleProgress * maxRadius * rippleSpeed;
-    
-    float ringDist = abs(dist - currentRadius);
-    float ring = smoothstep(rippleWidth, 0.0, ringDist);
-    
-    float fadeOut = 1.0 - smoothstep(0.0, rippleDuration, timeSinceClick);
-    
-    return ring * fadeOut;
+  float maskCircle(vec2 p, float cov) {
+    float r = sqrt(cov) * .25;
+    float d = length(p - 0.5) - r;
+    float aa = 0.5 * fwidth(d);
+    return cov * (1.0 - smoothstep(-aa, aa, d * 2.0));
   }
   
   void main() {
     vec2 uv = vUv;
     
-    float lowFpsTime = floor(uTime * 12.0) / 12.0;
-    
-    float ripple0 = calcRipple(uv, uClickPos0, uClickTime0, lowFpsTime, uAspect);
-    float ripple1 = calcRipple(uv, uClickPos1, uClickTime1, lowFpsTime, uAspect);
-    float ripple2 = calcRipple(uv, uClickPos2, uClickTime2, lowFpsTime, uAspect);
-    
-    float totalRipple = max(max(ripple0, ripple1), ripple2);
-    
+    // Sample original texture
     vec4 texColor = texture2D(uTexture, uv);
-    float alpha = texColor.a;
-    
-    bool isLetter = alpha > 0.1;
-    
-    if (!isLetter && totalRipple < 0.01) {
-      discard;
-    }
-    
     float luma = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
     
-    float pixelSize = 1.5;
-    vec2 pixelCoord = floor(uv * uResolution / pixelSize);
+    // Calculate burst effect only in click areas
+    float pixelSize = uPixelSize;
+    vec2 fragCoord = gl_FragCoord.xy - uResolution * .5;
+    float aspectRatio = uResolution.x / uResolution.y;
     
-    float timeOffset = floor(lowFpsTime * 8.0);
-    vec2 animatedPixel = pixelCoord + vec2(
-      random(vec2(timeOffset, 0.0)) * 8.0,
-      random(vec2(0.0, timeOffset)) * 8.0
-    );
+    vec2 pixelId = floor(fragCoord / pixelSize);
+    vec2 pixelUV = fract(fragCoord / pixelSize);
     
-    float bayerThreshold = bayer8x8(animatedPixel);
+    float cellPixelSize = 8.0 * pixelSize;
+    vec2 cellId = floor(fragCoord / cellPixelSize);
+    vec2 cellCoord = cellId * cellPixelSize;
+    vec2 cellUV = cellCoord / uResolution * vec2(aspectRatio, 1.0);
     
-    float noiseIntensity = 0.3 * totalRipple;
-    float timeNoise = random(pixelCoord + vec2(timeOffset * 0.5)) * noiseIntensity;
-    float spatialNoise = random(pixelCoord * 0.1 + vec2(timeOffset)) * noiseIntensity * 0.5;
-    float noise = (timeNoise + spatialNoise) - noiseIntensity * 0.5;
-    float threshold = bayerThreshold + noise;
+    float base = fbm2(cellUV, uTime * 0.05);
+    base = base * 0.5 - 0.65;
     
-    float dithered = step(threshold, luma);
-    vec3 ditheredColor = vec3(dithered);
+    float feed = base + (uDensity - 0.5) * 0.3;
     
-    vec3 rippleColor = vec3(1.0, 1.0, 1.0);
+    float speed = uRippleSpeed;
+    float thickness = uRippleThickness;
+    const float dampT = 1.0;
+    const float dampR = 10.0;
     
-    vec3 coloredDither = mix(ditheredColor, ditheredColor * rippleColor, 0.7);
-    
-    vec3 finalColor;
-    float finalAlpha;
-    
-    if (isLetter) {
-      finalColor = mix(texColor.rgb, coloredDither, totalRipple);
-      finalAlpha = alpha;
-    } else {
-      float invertedDithered = 1.0 - step(threshold, totalRipple * 0.5);
-      vec3 blackDots = vec3(invertedDithered);
-      finalColor = blackDots;
-      finalAlpha = (1.0 - invertedDithered) * totalRipple;
+    // Calculate ripple bursts from clicks
+    float burstIntensity = 0.0;
+    for (int i = 0; i < MAX_CLICKS; ++i) {
+      vec2 pos = uClickPos[i];
+      if (pos.x < 0.0) continue;
+      float cellPixelSize = 8.0 * pixelSize;
+      vec2 cuv = (((pos - uResolution * .5 - cellPixelSize * .5) / (uResolution))) * vec2(aspectRatio, 1.0);
+      float t = max(uTime - uClickTimes[i], 0.0);
+      float r = distance(cellUV, cuv);
+      float waveR = speed * t;
+      float ring  = exp(-pow((r - waveR) / thickness, 2.0));
+      float atten = exp(-dampT * t) * exp(-dampR * r);
+      burstIntensity = max(burstIntensity, ring * atten * uRippleIntensity);
     }
     
-    gl_FragColor = vec4(finalColor, finalAlpha);
+    // Only apply burst effect where there's burst intensity
+    if (burstIntensity > 0.01) {
+      bool isLetter = texColor.a > 0.5;
+      
+      // Always use burst intensity for feed
+      feed = burstIntensity;
+      
+      float bayer = Bayer8(fragCoord / uPixelSize) - 0.5;
+      float bw = step(0.5, feed + bayer);
+      
+      float h = fract(sin(dot(floor(fragCoord / uPixelSize), vec2(127.1, 311.7))) * 43758.5453);
+      float jitterScale = 1.0 + (h - 0.5) * 0.0;
+      float coverage = bw * jitterScale;
+      float M = maskCircle(pixelUV, coverage);
+      
+      // White dots on letters, black dots on background
+      vec3 burstColor = isLetter ? vec3(1.0) : vec3(0.0);
+      
+      // Render both white and black dots with full opacity
+      if (M > 0.01) {
+        gl_FragColor = vec4(burstColor, M);
+      } else {
+        discard;
+      }
+    } else {
+      // No burst, render transparent (original image shows through)
+      discard;
+    }
   }
 `
+
+const MAX_CLICKS = 10
 
 export class RippleClickEffectV2 {
   constructor(container, imageSrc, width, height) {
     this.container = container
     this.width = width
     this.height = height
+    this.disposed = false
     
-    this.ripples = [
-      { pos: new THREE.Vector2(0.5, 0.5), time: -10 },
-      { pos: new THREE.Vector2(0.5, 0.5), time: -10 },
-      { pos: new THREE.Vector2(0.5, 0.5), time: -10 }
-    ]
-    this.nextRippleIndex = 0
+    this.config = {
+      pixelSize: 4.5,
+      patternScale: 1,
+      patternDensity: 1,
+      rippleIntensityScale: 1,
+      rippleThickness: 0.1,
+      rippleSpeed: 0.6,
+      speed: 0.75
+    }
     
     this.init(imageSrc)
   }
@@ -203,20 +220,31 @@ export class RippleClickEffectV2 {
     texture.minFilter = THREE.LinearFilter
     texture.magFilter = THREE.LinearFilter
     
+    const clickPositions = []
+    const clickTimes = []
+    for (let i = 0; i < MAX_CLICKS; i++) {
+      clickPositions.push(new THREE.Vector2(-1, -1))
+      clickTimes.push(0)
+    }
+    
     this.material = new THREE.ShaderMaterial({
       vertexShader,
       fragmentShader,
       uniforms: {
         uTexture: { value: texture },
+        uResolution: { value: new THREE.Vector2(
+          this.renderer.domElement.width,
+          this.renderer.domElement.height
+        )},
         uTime: { value: 0 },
-        uResolution: { value: new THREE.Vector2(this.width, this.height) },
-        uAspect: { value: this.width / this.height },
-        uClickPos0: { value: new THREE.Vector2(0.5, 0.5) },
-        uClickTime0: { value: -10 },
-        uClickPos1: { value: new THREE.Vector2(0.5, 0.5) },
-        uClickTime1: { value: -10 },
-        uClickPos2: { value: new THREE.Vector2(0.5, 0.5) },
-        uClickTime2: { value: -10 }
+        uClickPos: { value: clickPositions },
+        uClickTimes: { value: new Float32Array(clickTimes) },
+        uPixelSize: { value: this.config.pixelSize * this.renderer.getPixelRatio() },
+        uScale: { value: this.config.patternScale },
+        uDensity: { value: this.config.patternDensity },
+        uRippleSpeed: { value: this.config.rippleSpeed },
+        uRippleThickness: { value: this.config.rippleThickness },
+        uRippleIntensity: { value: this.config.rippleIntensityScale }
       },
       transparent: true
     })
@@ -225,8 +253,10 @@ export class RippleClickEffectV2 {
     this.mesh = new THREE.Mesh(geometry, this.material)
     this.scene.add(this.mesh)
     
-    this.addEventListeners()
+    this.clock = new THREE.Clock()
+    this.clickIndex = 0
     
+    this.addEventListeners()
     this.animate()
   }
   
@@ -241,7 +271,6 @@ export class RippleClickEffectV2 {
         const ctx = canvas.getContext('2d')
         
         ctx.clearRect(0, 0, canvas.width, canvas.height)
-        
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
         
         const texture = new THREE.CanvasTexture(canvas)
@@ -257,34 +286,47 @@ export class RippleClickEffectV2 {
     
     canvas.addEventListener('click', (e) => {
       const rect = canvas.getBoundingClientRect()
-      const clickX = (e.clientX - rect.left) / rect.width
-      const clickY = 1 - (e.clientY - rect.top) / rect.height
+      const scaleX = canvas.width / rect.width
+      const scaleY = canvas.height / rect.height
+      const fx = (e.clientX - rect.left) * scaleX
+      const fy = (rect.height - (e.clientY - rect.top)) * scaleY
       
-      const ripple = this.ripples[this.nextRippleIndex]
-      ripple.pos.x = clickX
-      ripple.pos.y = clickY
-      ripple.time = performance.now() * 0.001
-      
-      this.material.uniforms[`uClickPos${this.nextRippleIndex}`].value.copy(ripple.pos)
-      this.material.uniforms[`uClickTime${this.nextRippleIndex}`].value = ripple.time
-      
-      this.nextRippleIndex = (this.nextRippleIndex + 1) % 3
+      const uniforms = this.material.uniforms
+      uniforms.uClickPos.value[this.clickIndex].set(fx, fy)
+      uniforms.uClickTimes.value[this.clickIndex] = uniforms.uTime.value
+      this.clickIndex = (this.clickIndex + 1) % MAX_CLICKS
     })
     
     canvas.style.cursor = 'pointer'
   }
   
   animate() {
+    if (this.disposed) return
+    
     requestAnimationFrame(() => this.animate())
     
-    this.material.uniforms.uTime.value = performance.now() * 0.001
+    const elapsed = this.clock.getElapsedTime() * this.config.speed
+    this.material.uniforms.uTime.value = elapsed
     
     this.renderer.render(this.scene, this.camera)
   }
   
   dispose() {
-    this.containerDiv?.parentNode?.removeChild(this.containerDiv)
-    this.renderer.dispose()
-    this.material.dispose()
+    this.disposed = true
+    
+    if (this.containerDiv?.parentNode) {
+      this.containerDiv.parentNode.removeChild(this.containerDiv)
+    }
+    
+    if (this.mesh) {
+      this.mesh.geometry.dispose()
+      this.material.dispose()
+    }
+    
+    if (this.renderer) {
+      this.renderer.dispose()
+    }
+    
+    if (this.scene) this.scene.clear()
   }
 }

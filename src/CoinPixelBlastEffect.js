@@ -592,7 +592,7 @@ export class CoinPixelBlastEffect {
     // Rotate coin with oscillation like CoinDitheringEffect
     if (this.coin) {
       const maxRotation = 25 * Math.PI / 180
-      const rotationAngle = Math.sin(elapsed * 0.2) * maxRotation
+      const rotationAngle = Math.sin(elapsed * 0.1) * maxRotation
       this.coin.rotation.z = rotationAngle
     }
     

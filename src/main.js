@@ -13,15 +13,15 @@ import * as rive from "@rive-app/canvas";
 
 // Available animation types
 const ANIMATION_TYPES = [
-  { id: 'ripple', name: 'Ripple', Effect: RippleClickEffect, riveCanvas: true },
-  { id: 'ripple-v2', name: 'Ripple V2', Effect: RippleClickEffectV2, riveCanvas: true },
-  { id: 'hover-trail-ripple', name: 'Hover Dither Trail Ripple', Effect: HoverTrailRippleEffect },
-  { id: 'ripple-ascii-white', name: 'Ripple ASCII White', Effect: RippleAsciiWhiteEffect },
-  { id: 'hover-trail-white', name: 'Hover Trail White', Effect: HoverTrailAsciiWhiteEffect },
-
+  // { id: 'ripple', name: 'Ripple', Effect: RippleClickEffect, riveCanvas: true },
+  { id: 'ripple-v2', name: 'Ripple', Effect: RippleClickEffectV2, riveCanvas: true },
+  // { id: 'hover-trail-ripple', name: 'Hover Dither Trail Ripple', Effect: HoverTrailRippleEffect },
+  // { id: 'ripple-ascii-white', name: 'Ripple ASCII White', Effect: RippleAsciiWhiteEffect },
+  // { id: 'hover-trail-white', name: 'Hover Trail White', Effect: HoverTrailAsciiWhiteEffect },
+  
+  { id: 'coin-pixelblast', name: 'Coin PixelBlast', Effect: CoinPixelBlastEffect, fullscreen: true },
   { id: 'dithering-coin', name: 'Dithering Coin', Effect: CoinDitheringEffect, fullscreen: true },
   { id: 'dithering-copy', name: 'Dithering Waves', Effect: DitheringEffectSimplex, fullscreen: true },
-  { id: 'coin-pixelblast', name: 'Coin PixelBlast', Effect: CoinPixelBlastEffect, fullscreen: true },
   // { id: 'dithering-image', name: 'Dithering Image', Effect: DitheringImageEffect, fullscreen: true },
 ]
 

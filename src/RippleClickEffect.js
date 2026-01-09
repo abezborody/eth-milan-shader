@@ -2,200 +2,210 @@ import * as THREE from 'three'
 
 // Vertex shader - simple passthrough
 const vertexShader = `
-  varying vec2 vUv;
   void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_Position = vec4(position, 1.0);
   }
 `
 
-// Fragment shader - pixelating ripple/shockwave effect on click (supports 3 ripples)
+// Fragment shader - pixel blast effect on click (supports 10 clicks like CoinPixelBlastEffect)
 const fragmentShader = `
+  precision highp float;
+  
   uniform sampler2D uTexture;
-  uniform float uTime;
   uniform vec2 uResolution;
-  uniform float uAspect;
+  uniform float uTime;
+  uniform float uPixelSize;
+  uniform float uScale;
+  uniform float uDensity;
+  uniform float uPixelJitter;
+  uniform int uEnableRipples;
+  uniform float uRippleSpeed;
+  uniform float uRippleThickness;
+  uniform float uRippleIntensity;
+  uniform int uShapeType;
   
-  // Click ripple uniforms - 3 ripples
-  uniform vec2 uClickPos0;
-  uniform float uClickTime0;
-  uniform vec2 uClickPos1;
-  uniform float uClickTime1;
-  uniform vec2 uClickPos2;
-  uniform float uClickTime2;
+  const int SHAPE_SQUARE   = 0;
+  const int SHAPE_CIRCLE   = 1;
+  const int SHAPE_TRIANGLE = 2;
+  const int SHAPE_DIAMOND  = 3;
   
-  varying vec2 vUv;
+  const int MAX_CLICKS = 10;
   
-  // Pseudo-random function
-  float random(vec2 st) {
-    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+  uniform vec2 uClickPos[MAX_CLICKS];
+  uniform float uClickTimes[MAX_CLICKS];
+  
+  // Bayer dithering functions from CoinPixelBlastEffect
+  float Bayer2(vec2 a) {
+    a = floor(a);
+    return fract(a.x / 2. + a.y * a.y * .75);
+  }
+  #define Bayer4(a) (Bayer2(.5*(a))*0.25 + Bayer2(a))
+  #define Bayer8(a) (Bayer4(.5*(a))*0.25 + Bayer2(a))
+  
+  #define FBM_OCTAVES 5
+  #define FBM_LACUNARITY 1.25
+  #define FBM_GAIN 1.0
+  
+  float hash11(float n) { 
+    return fract(sin(n)*43758.5453); 
   }
   
-  // Bayer matrix 8x8 for ordered dithering
-  float bayer8x8(vec2 pos) {
-    int x = int(mod(pos.x, 8.0));
-    int y = int(mod(pos.y, 8.0));
-    int index = x + y * 8;
-    
-    // Bayer 8x8 matrix values normalized to 0-1
-    float matrix[64];
-    matrix[0] = 0.0/64.0;   matrix[1] = 32.0/64.0;  matrix[2] = 8.0/64.0;   matrix[3] = 40.0/64.0;
-    matrix[4] = 2.0/64.0;   matrix[5] = 34.0/64.0;  matrix[6] = 10.0/64.0;  matrix[7] = 42.0/64.0;
-    matrix[8] = 48.0/64.0;  matrix[9] = 16.0/64.0;  matrix[10] = 56.0/64.0; matrix[11] = 24.0/64.0;
-    matrix[12] = 50.0/64.0; matrix[13] = 18.0/64.0; matrix[14] = 58.0/64.0; matrix[15] = 26.0/64.0;
-    matrix[16] = 12.0/64.0; matrix[17] = 44.0/64.0; matrix[18] = 4.0/64.0;  matrix[19] = 36.0/64.0;
-    matrix[20] = 14.0/64.0; matrix[21] = 46.0/64.0; matrix[22] = 6.0/64.0;  matrix[23] = 38.0/64.0;
-    matrix[24] = 60.0/64.0; matrix[25] = 28.0/64.0; matrix[26] = 52.0/64.0; matrix[27] = 20.0/64.0;
-    matrix[28] = 62.0/64.0; matrix[29] = 30.0/64.0; matrix[30] = 54.0/64.0; matrix[31] = 22.0/64.0;
-    matrix[32] = 3.0/64.0;  matrix[33] = 35.0/64.0; matrix[34] = 11.0/64.0; matrix[35] = 43.0/64.0;
-    matrix[36] = 1.0/64.0;  matrix[37] = 33.0/64.0; matrix[38] = 9.0/64.0;  matrix[39] = 41.0/64.0;
-    matrix[40] = 51.0/64.0; matrix[41] = 19.0/64.0; matrix[42] = 59.0/64.0; matrix[43] = 27.0/64.0;
-    matrix[44] = 49.0/64.0; matrix[45] = 17.0/64.0; matrix[46] = 57.0/64.0; matrix[47] = 25.0/64.0;
-    matrix[48] = 15.0/64.0; matrix[49] = 47.0/64.0; matrix[50] = 7.0/64.0;  matrix[51] = 39.0/64.0;
-    matrix[52] = 13.0/64.0; matrix[53] = 45.0/64.0; matrix[54] = 5.0/64.0;  matrix[55] = 37.0/64.0;
-    matrix[56] = 63.0/64.0; matrix[57] = 31.0/64.0; matrix[58] = 55.0/64.0; matrix[59] = 23.0/64.0;
-    matrix[60] = 61.0/64.0; matrix[61] = 29.0/64.0; matrix[62] = 53.0/64.0; matrix[63] = 21.0/64.0;
-    
-    for (int i = 0; i < 64; i++) {
-      if (i == index) return matrix[i];
+  float vnoise(vec3 p) {
+    vec3 ip = floor(p);
+    vec3 fp = fract(p);
+    float n000 = hash11(dot(ip + vec3(0.0,0.0,0.0), vec3(1.0,57.0,113.0)));
+    float n100 = hash11(dot(ip + vec3(1.0,0.0,0.0), vec3(1.0,57.0,113.0)));
+    float n010 = hash11(dot(ip + vec3(0.0,1.0,0.0), vec3(1.0,57.0,113.0)));
+    float n110 = hash11(dot(ip + vec3(1.0,1.0,0.0), vec3(1.0,57.0,113.0)));
+    float n001 = hash11(dot(ip + vec3(0.0,0.0,1.0), vec3(1.0,57.0,113.0)));
+    float n101 = hash11(dot(ip + vec3(1.0,0.0,1.0), vec3(1.0,57.0,113.0)));
+    float n011 = hash11(dot(ip + vec3(0.0,1.0,1.0), vec3(1.0,57.0,113.0)));
+    float n111 = hash11(dot(ip + vec3(1.0,1.0,1.0), vec3(1.0,57.0,113.0)));
+    vec3 w = fp*fp*fp*(fp*(fp*6.0-15.0)+10.0);
+    float x00 = mix(n000, n100, w.x);
+    float x10 = mix(n010, n110, w.x);
+    float x01 = mix(n001, n101, w.x);
+    float x11 = mix(n011, n111, w.x);
+    float y0  = mix(x00, x10, w.y);
+    float y1  = mix(x01, x11, w.y);
+    return mix(y0, y1, w.z) * 2.0 - 1.0;
+  }
+  
+  float fbm2(vec2 uv, float t) {
+    vec3 p = vec3(uv * uScale, t);
+    float amp = 1.0;
+    float freq = 1.0;
+    float sum = 1.0;
+    for (int i = 0; i < FBM_OCTAVES; ++i) {
+      sum  += amp * vnoise(p * freq);
+      freq *= FBM_LACUNARITY;
+      amp  *= FBM_GAIN;
     }
-    return 0.0;
+    return sum * 0.5 + 0.5;
   }
   
-  // Calculate ripple with displacement info
-  vec3 calcRippleWithDisplacement(vec2 uv, vec2 clickPos, float clickTime, float time, float aspect) {
-    float timeSinceClick = time - clickTime;
-    
-    // Ripple parameters
-    float rippleSpeed = 1.2;
-    float rippleWidth = 0.3;
-    float rippleDuration = 1.6;
-    float maxRadius = 1.5;
-    
-    // Check if ripple is active
-    float rippleAlive = step(0.0, timeSinceClick) * step(timeSinceClick, rippleDuration);
-    if (rippleAlive < 0.5) return vec3(0.0);
-    
-    // Aspect-corrected distance from click point
-    vec2 aspectCorrectedUV = uv;
-    aspectCorrectedUV.x *= aspect;
-    vec2 aspectCorrectedClick = clickPos;
-    aspectCorrectedClick.x *= aspect;
-    
-    float dist = distance(aspectCorrectedUV, aspectCorrectedClick);
-    
-    // Current ripple radius
-    float rippleProgress = timeSinceClick / rippleDuration;
-    float currentRadius = rippleProgress * maxRadius * rippleSpeed;
-    
-    // Ripple ring
-    float ringDist = abs(dist - currentRadius);
-    float ring = smoothstep(rippleWidth, 0.0, ringDist);
-    
-    // Fade out over time
-    float fadeOut = 1.0 - smoothstep(0.0, rippleDuration, timeSinceClick);
-    
-    // Direction from click point for displacement
-    vec2 direction = normalize(uv - clickPos);
-    
-    // Return: x = intensity, y = direction.x, z = direction.y
-    return vec3(ring * fadeOut, direction.x, direction.y);
+  float maskCircle(vec2 p, float cov) {
+    float r = sqrt(cov) * .25;
+    float d = length(p - 0.5) - r;
+    float aa = 0.5 * fwidth(d);
+    return cov * (1.0 - smoothstep(-aa, aa, d * 2.0));
+  }
+  
+  float maskTriangle(vec2 p, vec2 id, float cov) {
+    bool flip = mod(id.x + id.y, 2.0) > 0.5;
+    if (flip) p.x = 1.0 - p.x;
+    float r = sqrt(cov);
+    float d  = p.y - r*(1.0 - p.x);
+    float aa = fwidth(d);
+    return cov * clamp(0.5 - d/aa, 0.0, 1.0);
+  }
+  
+  float maskDiamond(vec2 p, float cov) {
+    float r = sqrt(cov) * 0.564;
+    return step(abs(p.x - 0.49) + abs(p.y - 0.49), r);
   }
   
   void main() {
-    vec2 uv = vUv;
+    vec2 uv = gl_FragCoord.xy / uResolution;
     
-    // Low FPS time - quantize time to 6fps for choppy animation
-    float lowFpsTime = floor(uTime * 12.0) / 12.0;
+    // Sample the original texture to get letter luminance
+    vec4 texColor = texture2D(uTexture, uv);
+    float luma = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
     
-    // Calculate all 3 ripples with displacement (using low fps time)
-    vec3 ripple0 = calcRippleWithDisplacement(uv, uClickPos0, uClickTime0, lowFpsTime, uAspect);
-    vec3 ripple1 = calcRippleWithDisplacement(uv, uClickPos1, uClickTime1, lowFpsTime, uAspect);
-    vec3 ripple2 = calcRippleWithDisplacement(uv, uClickPos2, uClickTime2, lowFpsTime, uAspect);
+    float pixelSize = uPixelSize;
+    vec2 fragCoord = gl_FragCoord.xy - uResolution * .5;
+    float aspectRatio = uResolution.x / uResolution.y;
     
-    // Combine ripple intensities
-    float totalRipple = max(max(ripple0.x, ripple1.x), ripple2.x);
+    vec2 pixelId = floor(fragCoord / pixelSize);
+    vec2 pixelUV = fract(fragCoord / pixelSize);
     
-    // Calculate combined displacement direction (weighted by intensity)
-    vec2 displacement = vec2(0.0);
-    displacement += ripple0.yz * ripple0.x;
-    displacement += ripple1.yz * ripple1.x;
-    displacement += ripple2.yz * ripple2.x;
+    float cellPixelSize = 8.0 * pixelSize;
+    vec2 cellId = floor(fragCoord / cellPixelSize);
+    vec2 cellCoord = cellId * cellPixelSize;
+    vec2 cellUV = cellCoord / uResolution * vec2(aspectRatio, 1.0);
     
-    // Apply UV displacement - wave distortion effect
-    float displacementStrength = 0.01;
-    vec2 displacedUV = uv - displacement * displacementStrength;
+    float base = fbm2(cellUV, uTime * 0.05);
+    base = base * 0.5 - 0.65;
     
-    // Sample texture with displaced UVs
-    vec4 originalColor = texture2D(uTexture, displacedUV);
+    float feed = base + (uDensity - 0.5) * 0.3;
     
-    // Get luminance
-    float luma = dot(originalColor.rgb, vec3(0.299, 0.587, 0.114));
+    float speed = uRippleSpeed;
+    float thickness = uRippleThickness;
+    const float dampT = 1.0;
+    const float dampR = 10.0;
     
-    // Smaller pixel size for finer dithering
-    float pixelSize = 1.5;
-    vec2 pixelCoord = floor(displacedUV * uResolution / pixelSize);
+    if (uEnableRipples == 1) {
+      for (int i = 0; i < MAX_CLICKS; ++i) {
+        vec2 pos = uClickPos[i];
+        if (pos.x < 0.0) continue;
+        float cellPixelSize = 8.0 * pixelSize;
+        vec2 cuv = (((pos - uResolution * .5 - cellPixelSize * .5) / (uResolution))) * vec2(aspectRatio, 1.0);
+        float t = max(uTime - uClickTimes[i], 0.0);
+        float r = distance(cellUV, cuv);
+        float waveR = speed * t;
+        float ring  = exp(-pow((r - waveR) / thickness, 2.0));
+        float atten = exp(-dampT * t) * exp(-dampR * r);
+        feed = max(feed, ring * atten * uRippleIntensity);
+      }
+    }
     
-    // Low fps time offset for choppy dithering animation
-    float timeOffset = floor(lowFpsTime * 8.0);
-    vec2 animatedPixel = pixelCoord + vec2(
-      random(vec2(timeOffset, 0.0)) * 8.0,
-      random(vec2(0.0, timeOffset)) * 8.0
-    );
+    float bayer = Bayer8(fragCoord / uPixelSize) - 0.5;
+    float bw = step(0.5, feed + bayer);
     
-    // Get Bayer threshold for this pixel
-    float bayerThreshold = bayer8x8(animatedPixel);
+    float h = fract(sin(dot(floor(fragCoord / uPixelSize), vec2(127.1, 311.7))) * 43758.5453);
+    float jitterScale = 1.0 + (h - 0.5) * uPixelJitter;
+    float coverage = bw * jitterScale;
+    float M;
+    if      (uShapeType == SHAPE_CIRCLE)   M = maskCircle(pixelUV, coverage);
+    else if (uShapeType == SHAPE_TRIANGLE) M = maskTriangle(pixelUV, pixelId, coverage);
+    else if (uShapeType == SHAPE_DIAMOND)  M = maskDiamond(pixelUV, coverage);
+    else                                   M = coverage;
     
-    // Add more noise over time inside ripple - increases with ripple intensity
-    float noiseIntensity = 0.3 * totalRipple;
-    float timeNoise = random(pixelCoord + vec2(timeOffset * 0.5)) * noiseIntensity;
-    float spatialNoise = random(pixelCoord * 0.1 + vec2(timeOffset)) * noiseIntensity * 0.5;
-    float noise = (timeNoise + spatialNoise) - noiseIntensity * 0.5;
-    float threshold = bayerThreshold + noise;
+    // White dots on letters (high luma), black dots outside (low luma)
+    vec3 color = vec3(luma);
     
-    // Apply dithering - black or white based on luminance vs threshold
-    float dithered = step(threshold, luma);
-    vec3 ditheredColor = vec3(dithered);
-    
-    // Ripple color FF2727 (red)
-    vec3 rippleColor = vec3(1.0, 1.0, 1.0);
-    
-    // Mix dithered with red tint based on ripple intensity
-    vec3 coloredDither = mix(ditheredColor, ditheredColor * rippleColor, 0.7);
-    
-    // Mix original with colored dithered based on ripple intensity
-    vec3 finalColor = mix(originalColor.rgb, coloredDither, totalRipple);
-    
-    gl_FragColor = vec4(finalColor, originalColor.a);
+    gl_FragColor = vec4(color, M * texColor.a);
   }
 `
+
+const SHAPE_MAP = {
+  square: 0,
+  circle: 1,
+  triangle: 2,
+  diamond: 3
+}
+
+const MAX_CLICKS = 10
 
 export class RippleClickEffect {
   constructor(container, imageSrc, width, height) {
     this.container = container
     this.width = width
     this.height = height
+    this.disposed = false
     
-    // Support 3 simultaneous ripples
-    this.ripples = [
-      { pos: new THREE.Vector2(0.5, 0.5), time: -10 },
-      { pos: new THREE.Vector2(0.5, 0.5), time: -10 },
-      { pos: new THREE.Vector2(0.5, 0.5), time: -10 }
-    ]
-    this.nextRippleIndex = 0
+    this.config = {
+      variant: 'circle',
+      pixelSize: 6,
+      patternScale: 2,
+      patternDensity: 1,
+      pixelSizeJitter: 0,
+      enableRipples: true,
+      rippleIntensityScale: 1,
+      rippleThickness: 0.1,
+      rippleSpeed: 0.4,
+      speed: 0.5
+    }
     
     this.init(imageSrc)
   }
   
   async init(imageSrc) {
-    // Create scene
     this.scene = new THREE.Scene()
     
-    // Create camera
     this.camera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 10)
     this.camera.position.z = 1
     
-    // Create renderer
     this.renderer = new THREE.WebGLRenderer({ 
       antialias: true, 
       alpha: true 
@@ -204,39 +214,50 @@ export class RippleClickEffect {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.container.appendChild(this.renderer.domElement)
     
-    // Load and rasterize SVG to canvas for proper texture
     const texture = await this.loadSVGAsTexture(imageSrc)
     texture.minFilter = THREE.LinearFilter
     texture.magFilter = THREE.LinearFilter
     
-    // Create material with shaders
+    const clickPositions = []
+    const clickTimes = []
+    for (let i = 0; i < MAX_CLICKS; i++) {
+      clickPositions.push(new THREE.Vector2(-1, -1))
+      clickTimes.push(0)
+    }
+    
     this.material = new THREE.ShaderMaterial({
       vertexShader,
       fragmentShader,
       uniforms: {
         uTexture: { value: texture },
+        uResolution: { value: new THREE.Vector2(
+          this.renderer.domElement.width,
+          this.renderer.domElement.height
+        )},
         uTime: { value: 0 },
-        uResolution: { value: new THREE.Vector2(this.width, this.height) },
-        uAspect: { value: this.width / this.height },
-        uClickPos0: { value: new THREE.Vector2(0.5, 0.5) },
-        uClickTime0: { value: -10 },
-        uClickPos1: { value: new THREE.Vector2(0.5, 0.5) },
-        uClickTime1: { value: -10 },
-        uClickPos2: { value: new THREE.Vector2(0.5, 0.5) },
-        uClickTime2: { value: -10 }
+        uClickPos: { value: clickPositions },
+        uClickTimes: { value: new Float32Array(clickTimes) },
+        uShapeType: { value: SHAPE_MAP[this.config.variant] ?? 0 },
+        uPixelSize: { value: this.config.pixelSize * this.renderer.getPixelRatio() },
+        uScale: { value: this.config.patternScale },
+        uDensity: { value: this.config.patternDensity },
+        uPixelJitter: { value: this.config.pixelSizeJitter },
+        uEnableRipples: { value: this.config.enableRipples ? 1 : 0 },
+        uRippleSpeed: { value: this.config.rippleSpeed },
+        uRippleThickness: { value: this.config.rippleThickness },
+        uRippleIntensity: { value: this.config.rippleIntensityScale }
       },
       transparent: true
     })
     
-    // Create plane geometry
     const geometry = new THREE.PlaneGeometry(1, 1)
     this.mesh = new THREE.Mesh(geometry, this.material)
     this.scene.add(this.mesh)
     
-    // Add event listeners
-    this.addEventListeners()
+    this.clock = new THREE.Clock()
+    this.clickIndex = 0
     
-    // Start animation
+    this.addEventListeners()
     this.animate()
   }
   
@@ -250,11 +271,9 @@ export class RippleClickEffect {
         canvas.height = this.height
         const ctx = canvas.getContext('2d')
         
-        // Fill with white background for visibility
         ctx.fillStyle = '#ffffff'
         ctx.fillRect(0, 0, canvas.width, canvas.height)
         
-        // Draw SVG
         ctx.drawImage(img, 0, 0, this.width, this.height)
         
         const texture = new THREE.CanvasTexture(canvas)
@@ -268,41 +287,48 @@ export class RippleClickEffect {
   addEventListeners() {
     const canvas = this.renderer.domElement
     
-    // Click event to trigger ripple (round-robin through 3 slots)
     canvas.addEventListener('click', (e) => {
       const rect = canvas.getBoundingClientRect()
-      const clickX = (e.clientX - rect.left) / rect.width
-      const clickY = 1 - (e.clientY - rect.top) / rect.height
+      const scaleX = canvas.width / rect.width
+      const scaleY = canvas.height / rect.height
+      const fx = (e.clientX - rect.left) * scaleX
+      const fy = (rect.height - (e.clientY - rect.top)) * scaleY
       
-      // Use next ripple slot
-      const ripple = this.ripples[this.nextRippleIndex]
-      ripple.pos.x = clickX
-      ripple.pos.y = clickY
-      ripple.time = performance.now() * 0.001
-      
-      // Update uniform for this ripple
-      this.material.uniforms[`uClickPos${this.nextRippleIndex}`].value.copy(ripple.pos)
-      this.material.uniforms[`uClickTime${this.nextRippleIndex}`].value = ripple.time
-      
-      // Move to next slot (round-robin)
-      this.nextRippleIndex = (this.nextRippleIndex + 1) % 3
+      const uniforms = this.material.uniforms
+      uniforms.uClickPos.value[this.clickIndex].set(fx, fy)
+      uniforms.uClickTimes.value[this.clickIndex] = uniforms.uTime.value
+      this.clickIndex = (this.clickIndex + 1) % MAX_CLICKS
     })
     
-    // Add cursor pointer to indicate clickable
     canvas.style.cursor = 'pointer'
   }
   
   animate() {
+    if (this.disposed) return
+    
     requestAnimationFrame(() => this.animate())
     
-    // Update time uniform
-    this.material.uniforms.uTime.value = performance.now() * 0.001
+    const elapsed = this.clock.getElapsedTime() * this.config.speed
+    this.material.uniforms.uTime.value = elapsed
     
     this.renderer.render(this.scene, this.camera)
   }
   
   dispose() {
-    this.renderer.dispose()
-    this.material.dispose()
+    this.disposed = true
+    
+    if (this.mesh) {
+      this.mesh.geometry.dispose()
+      this.material.dispose()
+    }
+    
+    if (this.renderer) {
+      this.renderer.dispose()
+      if (this.renderer.domElement.parentElement === this.container) {
+        this.container.removeChild(this.renderer.domElement)
+      }
+    }
+    
+    if (this.scene) this.scene.clear()
   }
 }
