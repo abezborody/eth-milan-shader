@@ -21,7 +21,7 @@ const ANIMATION_TYPES = [
   
   { id: 'coin-pixelblast', name: 'Coin PixelBlast', Effect: CoinPixelBlastEffect, fullscreen: true },
   { id: 'dithering-coin', name: 'Dithering Coin', Effect: CoinDitheringEffect, fullscreen: true },
-  { id: 'dithering-copy', name: 'Dithering Waves', Effect: DitheringEffectSimplex, fullscreen: true },
+  // { id: 'dithering-copy', name: 'Dithering Waves', Effect: DitheringEffectSimplex, fullscreen: true },
   // { id: 'dithering-image', name: 'Dithering Image', Effect: DitheringImageEffect, fullscreen: true },
 ]
 

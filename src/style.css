@@ -47,5 +47,6 @@ canvas {
 .canvas-container {
   display: flex;
   justify-content: space-between;
-  padding: 0 24px 24px;
+  max-width: 1280px;
+  /* padding: 0 24px 24px; */
 }

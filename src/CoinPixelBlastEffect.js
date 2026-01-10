@@ -27,6 +27,10 @@ uniform float uRippleSpeed;
 uniform float uRippleThickness;
 uniform float uRippleIntensity;
 uniform float uEdgeFade;
+uniform vec3 uSpotlightPos;
+uniform vec3 uSpotlightTarget;
+uniform float uSpotlightAngle;
+uniform float uSpotlightPenumbra;
 
 uniform int   uShapeType;
 const int SHAPE_SQUARE   = 0;
@@ -164,6 +168,35 @@ void main(){
     M *= fade;
   }
 
+  // Calculate spotlight mask to hide particles in lit areas
+  // Convert fragment position to world space (background plane is at z=0)
+  vec2 screenPos = (gl_FragCoord.xy / uResolution) * 2.0 - 1.0;
+  float aspectRatio2 = uResolution.x / uResolution.y;
+  screenPos.x *= aspectRatio2;
+  vec3 worldPos = vec3(screenPos * 1.0, 0.0); // Background plane at z=0
+  
+  // Calculate the spotlight projection onto the background plane
+  vec3 spotDir = normalize(uSpotlightTarget - uSpotlightPos);
+  vec3 lightToFrag = worldPos - uSpotlightPos;
+  
+  // Project the light ray onto the background plane (z=0)
+  // Find intersection point of light ray with plane
+  float t = -uSpotlightPos.z / spotDir.z;
+  vec3 spotCenterOnPlane = uSpotlightPos + spotDir * t;
+  
+  // Calculate distance from fragment to spotlight center on plane
+  float distFromCenter = length(worldPos.xy - spotCenterOnPlane.xy);
+  
+  // Calculate spotlight radius at the plane
+  float spotRadius = abs(t) * tan(uSpotlightAngle);
+  float spotOuterRadius = abs(t) * tan(uSpotlightAngle + uSpotlightPenumbra);
+  
+  // Create smooth spotlight mask (1.0 = in spotlight, 0.0 = outside spotlight)
+  float spotMask = 1.0 - smoothstep(spotRadius, spotOuterRadius, distFromCenter);
+  
+  // Hide particles where spotlight hits (original logic for background)
+  M *= (1.0 - spotMask * 0.98);
+
   vec3 color = uColor;
 
   // sRGB gamma correction - convert linear to sRGB for accurate color output
@@ -181,12 +214,14 @@ void main(){
 const coinVertexShader = `
 varying vec3 vNormal;
 varying vec3 vPosition;
+varying vec3 vWorldPosition;
 varying vec2 vUv;
 
 void main() {
   vUv = uv;
   vNormal = normalize(normalMatrix * normal);
   vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+  vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
 `
@@ -197,6 +232,7 @@ precision mediump float;
 
 varying vec3 vNormal;
 varying vec3 vPosition;
+varying vec3 vWorldPosition;
 varying vec2 vUv;
 
 uniform vec3 u_lightPosition;
@@ -208,6 +244,10 @@ uniform float u_pxSize;
 uniform vec4 u_colorBack;
 uniform vec4 u_colorFront;
 uniform float u_roughness;
+uniform vec3 u_spotlightPos;
+uniform vec3 u_spotlightTarget;
+uniform float u_spotlightAngle;
+uniform float u_spotlightPenumbra;
 
 // 8x8 Bayer matrix
 const int bayer8x8[64] = int[64](
@@ -266,6 +306,14 @@ void main() {
   // Combine lighting
   float lightValue = u_ambientLight.r + (u_lightIntensity * diff);
   
+  // Calculate spotlight mask - where light is stronger, reduce dithering
+  vec3 spotDir = normalize(u_spotlightTarget - u_spotlightPos);
+  vec3 lightToFrag = normalize(vWorldPosition - u_spotlightPos);
+  float spotAngle = dot(spotDir, lightToFrag);
+  float spotCutoff = cos(u_spotlightAngle);
+  float spotOuterCutoff = cos(u_spotlightAngle + u_spotlightPenumbra);
+  float spotMask = smoothstep(spotOuterCutoff, spotCutoff, spotAngle);
+  
   // Use the same dithering logic as CoinDitheringEffect
   float pxSize = u_pxSize;
   vec2 pxSizeUV = gl_FragCoord.xy - 0.5 * u_resolution;
@@ -275,10 +323,23 @@ void main() {
   float dithering = getBayerValue(pxSizeUV, 8);
   dithering -= 1.2;
   
-  // Apply dithering to lighting value
-  float res = step(0.5, lightValue + dithering);
+  // ADJUSTED DITHERING: Smooth transition from spotlight to shadow
+  // In spotlight (spotMask = 1.0): no dithering (smooth surface)
+  // In shadow (spotMask = 0.0): maximum dithering (lots of dots)
   
-  // Mix colors like CoinDitheringEffect
+  // Invert spotMask so shadow areas get MORE dithering
+  float shadowFactor = 1.0 - spotMask;
+  
+  // Amplify dithering in shadow areas, reduce in spotlight
+  // shadowFactor = 0.0 in spotlight -> minimal dithering
+  // shadowFactor = 1.0 in shadow -> enhanced dithering
+  float ditheringMultiplier = 0.15 + shadowFactor * 1.2;
+  float adjustedDithering = dithering * ditheringMultiplier;
+  
+  // Apply dithering with normal light calculation
+  float res = step(0.5, lightValue + adjustedDithering);
+  
+  // Mix colors - INVERTED: white dots on dark background
   vec3 fgColor = u_colorFront.rgb * u_colorFront.a;
   float fgOpacity = u_colorFront.a;
   vec3 bgColor = u_colorBack.rgb * u_colorBack.a;
@@ -412,7 +473,11 @@ export class CoinPixelBlastEffect {
       uRippleSpeed: { value: this.config.rippleSpeed },
       uRippleThickness: { value: this.config.rippleThickness },
       uRippleIntensity: { value: this.config.rippleIntensityScale },
-      uEdgeFade: { value: this.config.edgeFade }
+      uEdgeFade: { value: this.config.edgeFade },
+      uSpotlightPos: { value: new THREE.Vector3() },
+      uSpotlightTarget: { value: new THREE.Vector3() },
+      uSpotlightAngle: { value: Math.PI / 6 },
+      uSpotlightPenumbra: { value: 0.4 }
     }
     
     this.bgMaterial = new THREE.ShaderMaterial({
@@ -435,18 +500,16 @@ export class CoinPixelBlastEffect {
   }
   
   createLights() {
-    // Create spotlight for upper part illumination (exact same as CoinDitheringEffect)
-    this.spotLight = new THREE.SpotLight(0xffffff, 4)
-    this.spotLight.position.set(0, 2, 4)
-    this.spotLight.target.position.set(0, 2, 6)
+    // Create spotlight pointing directly at the coin position
+    this.spotLight = new THREE.SpotLight(0xffffff, 8)
+    this.spotLight.position.set(0.66, -0.66, -1) // In front of coin
+    this.spotLight.target.position.set(0.5, -2, 3) // Coin position
     this.scene.add(this.spotLight.target)
-    this.spotLight.angle = Math.PI / 3
-    this.spotLight.penumbra = 1.5
-    this.spotLight.decay = 1
-    this.spotLight.distance = 5
-    this.spotLight.castShadow = true
-    this.spotLight.shadow.mapSize.width = 1024
-    this.spotLight.shadow.mapSize.height = 1024
+    this.spotLight.angle = Math.PI / 60 // Narrower spotlight
+    this.spotLight.penumbra = 0.5
+    this.spotLight.decay = 10
+    this.spotLight.distance = 10
+    this.spotLight.castShadow = false
     this.scene.add(this.spotLight)
     
     // Add ambient light for subtle base illumination (exact same as CoinDitheringEffect)
@@ -456,7 +519,7 @@ export class CoinPixelBlastEffect {
     // Add directional light from top to enhance the spotlight effect (exact same as CoinDitheringEffect)
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
     directionalLight.position.set(0, 4, 2)
-    directionalLight.castShadow = true
+    directionalLight.castShadow = false
     this.scene.add(directionalLight)
   }
   
@@ -504,13 +567,17 @@ export class CoinPixelBlastEffect {
                 u_pxSize: { value: 6 },
                 u_colorBack: { value: new THREE.Vector4(0.06, 0.06, 0.06, 1.0) },
                 u_colorFront: { value: new THREE.Vector4(1.0, 1.0, 1.0, 1.0) },
-                u_roughness: { value: 0.5 }
+                u_roughness: { value: 0.4 },
+                u_spotlightPos: { value: new THREE.Vector3() },
+                u_spotlightTarget: { value: new THREE.Vector3() },
+                u_spotlightAngle: { value: Math.PI / 8 },
+                u_spotlightPenumbra: { value: 0.4 }
               },
               side: THREE.DoubleSide,
               transparent: true
             })
-            child.castShadow = true
-            child.receiveShadow = true
+            child.castShadow = false
+            child.receiveShadow = false
           }
         })
         
@@ -573,26 +640,36 @@ export class CoinPixelBlastEffect {
     // Update background shader time
     this.bgMaterial.uniforms.uTime.value = elapsed
     
-    // Update coin shader time to match background
+    // Update coin shader uniforms
     if (this.coin) {
       this.coin.traverse((child) => {
-        if (child.isMesh && child.material.uniforms && child.material.uniforms.u_time) {
-          child.material.uniforms.u_time.value = elapsed
+        if (child.isMesh && child.material.uniforms) {
+          if (child.material.uniforms.u_time) {
+            child.material.uniforms.u_time.value = elapsed
+          }
+          // Update spotlight uniforms for coin shader
+          if (child.material.uniforms.u_spotlightPos && this.spotLight) {
+            child.material.uniforms.u_spotlightPos.value.copy(this.spotLight.position)
+            child.material.uniforms.u_spotlightTarget.value.copy(this.spotLight.target.position)
+            child.material.uniforms.u_spotlightAngle.value = this.spotLight.angle
+            child.material.uniforms.u_spotlightPenumbra.value = this.spotLight.penumbra
+          }
         }
       })
     }
     
-    // Animate spotlight
+    // Update spotlight uniforms for shader masking
     if (this.spotLight) {
-      const lightX = Math.sin(elapsed * 0.5) * 0.1
-      const lightY = 0.5 + Math.cos(elapsed * 0.3) * 0.05
-      this.spotLight.position.set(lightX, lightY, 0.5)
+      this.bgMaterial.uniforms.uSpotlightPos.value.copy(this.spotLight.position)
+      this.bgMaterial.uniforms.uSpotlightTarget.value.copy(this.spotLight.target.position)
+      this.bgMaterial.uniforms.uSpotlightAngle.value = this.spotLight.angle
+      this.bgMaterial.uniforms.uSpotlightPenumbra.value = this.spotLight.penumbra
     }
     
     // Rotate coin with oscillation like CoinDitheringEffect
     if (this.coin) {
-      const maxRotation = 25 * Math.PI / 180
-      const rotationAngle = Math.sin(elapsed * 0.1) * maxRotation
+      const maxRotation = 20 * Math.PI / 180
+      const rotationAngle = Math.sin(elapsed * 1.0) * maxRotation
       this.coin.rotation.z = rotationAngle
     }
     
