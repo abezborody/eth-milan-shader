@@ -76,13 +76,7 @@ const fragmentShader = `
     return sum * 0.5 + 0.5;
   }
   
-  float maskCircle(vec2 p, float cov) {
-    float r = sqrt(cov) * .25;
-    float d = length(p - 0.5) - r;
-    float aa = 0.5 * fwidth(d);
-    return cov * (1.0 - smoothstep(-aa, aa, d * 2.0));
-  }
-  
+    
   void main() {
     vec2 uv = vUv;
     
@@ -141,14 +135,13 @@ const fragmentShader = `
       float h = fract(sin(dot(floor(fragCoord / uPixelSize), vec2(127.1, 311.7))) * 43758.5453);
       float jitterScale = 1.0 + (h - 0.5) * 0.0;
       float coverage = bw * jitterScale;
-      float M = maskCircle(pixelUV, coverage);
       
       // White dots on letters, black dots on background
       vec3 burstColor = isLetter ? vec3(1.0) : vec3(0.0);
       
-      // Render both white and black dots with full opacity
-      if (M > 0.01) {
-        gl_FragColor = vec4(burstColor, M);
+      // Render square dots with full opacity
+      if (coverage > 0.01) {
+        gl_FragColor = vec4(burstColor, coverage);
       } else {
         discard;
       }

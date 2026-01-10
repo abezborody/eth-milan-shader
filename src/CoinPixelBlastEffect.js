@@ -312,17 +312,17 @@ export class CoinPixelBlastEffect {
     
     // PixelBlast configuration
     this.config = {
-      variant: 'circle',
-      pixelSize: 6,
+      variant: 'square',
+      pixelSize: 4,
       color: '#fff',
-      patternScale: 2,
+      patternScale: 3,
       patternDensity: 1,
       pixelSizeJitter: 0,
       enableRipples: true,
       rippleIntensityScale: 1,
       rippleThickness: 0.1,
       rippleSpeed: 0.4,
-      speed: 0.5,
+      speed: 0.2,
       edgeFade: 0.1
     }
     
@@ -501,7 +501,7 @@ export class CoinPixelBlastEffect {
                 u_lightIntensity: { value: 0.43 },
                 u_ambientLight: { value: new THREE.Color(0.4, 0.4, 0.4) },
                 u_resolution: { value: new THREE.Vector2(this.width, this.height) },
-                u_pxSize: { value: 5 },
+                u_pxSize: { value: 6 },
                 u_colorBack: { value: new THREE.Vector4(0.06, 0.06, 0.06, 1.0) },
                 u_colorFront: { value: new THREE.Vector4(1.0, 1.0, 1.0, 1.0) },
                 u_roughness: { value: 0.5 }
