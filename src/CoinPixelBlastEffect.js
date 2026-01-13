@@ -567,7 +567,7 @@ export class CoinPixelBlastEffect {
                 u_lightIntensity: { value: 0.43 },
                 u_ambientLight: { value: new THREE.Color(0.4, 0.4, 0.4) },
                 u_resolution: { value: new THREE.Vector2(this.width, this.height) },
-                u_pxSize: { value: 5 },
+                u_pxSize: { value: 6 },
                 u_colorBack: { value: new THREE.Vector4(0.0, 0.0, 0.0, 1.0) },
                 u_colorFront: { value: new THREE.Vector4(1.0, 1.0, 1.0, 1.0) },
                 u_roughness: { value: 0.4 },
