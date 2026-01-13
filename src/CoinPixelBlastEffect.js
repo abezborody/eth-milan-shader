@@ -1,8 +1,5 @@
 import * as THREE from 'three'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js'
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 
 // PixelBlast shader - vertex shader
 const pixelBlastVertexShader = `
@@ -351,6 +348,12 @@ void main() {
   color += bgColor * (1.0 - opacity);
   opacity += bgOpacity * (1.0 - opacity);
   
+  // Clamp very dark colors to pure black
+  float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+  if (luminance < 0.08) {
+    color = vec3(0.0);
+  }
+  
   gl_FragColor = vec4(color, opacity);
 }
 `
@@ -384,7 +387,7 @@ export class CoinPixelBlastEffect {
       rippleThickness: 0.1,
       rippleSpeed: 0.4,
       speed: 0.2,
-      edgeFade: 0.1
+      edgeFade: 0
     }
     
     this.init()
@@ -564,8 +567,8 @@ export class CoinPixelBlastEffect {
                 u_lightIntensity: { value: 0.43 },
                 u_ambientLight: { value: new THREE.Color(0.4, 0.4, 0.4) },
                 u_resolution: { value: new THREE.Vector2(this.width, this.height) },
-                u_pxSize: { value: 6 },
-                u_colorBack: { value: new THREE.Vector4(0.06, 0.06, 0.06, 1.0) },
+                u_pxSize: { value: 5 },
+                u_colorBack: { value: new THREE.Vector4(0.0, 0.0, 0.0, 1.0) },
                 u_colorFront: { value: new THREE.Vector4(1.0, 1.0, 1.0, 1.0) },
                 u_roughness: { value: 0.4 },
                 u_spotlightPos: { value: new THREE.Vector3() },
