@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 // PixelBlast shader - vertex shader
 const pixelBlastVertexShader = `
@@ -527,36 +527,36 @@ export class CoinPixelBlastEffect {
   }
   
   loadCoin() {
-    const loader = new FBXLoader()
-    
+    const loader = new GLTFLoader()
+
     loader.load(
-      '/ETH.fbx',
-      (fbx) => {
-        this.coin = fbx
-        
+      '/eth-coin.glb.txt',
+      (gltf) => {
+        this.coin = gltf.scene
+
         // Center the model like in CoinDitheringEffect
-        const box = new THREE.Box3().setFromObject(fbx)
+        const box = new THREE.Box3().setFromObject(gltf.scene)
         const center = box.getCenter(new THREE.Vector3())
         const size = box.getSize(new THREE.Vector3())
-        
-        fbx.position.sub(center)
-        
+
+        gltf.scene.position.sub(center)
+
         // Scale the model to fit the scene
         const maxDim = Math.max(size.x, size.y, size.z)
         const targetSize = 1.5
         const scale = targetSize / maxDim
-        fbx.scale.setScalar(scale)
-        
+        gltf.scene.scale.setScalar(scale)
+
         // Position the model in front of the background plane
-        fbx.position.set(0.66, -0.66, 3)
-        
+        gltf.scene.position.set(0.66, -0.66, 3)
+
         // Rotate to show the front side better
-        fbx.rotation.x = Math.PI * 1.35
-        fbx.rotation.y = Math.PI * 1.1
-        fbx.rotation.z = Math.PI * 0.2
-        
+        gltf.scene.rotation.x = Math.PI * 1.35
+        gltf.scene.rotation.y = Math.PI * 1.1
+        gltf.scene.rotation.z = Math.PI * 0.2
+
         // Apply material with same shader as background
-        fbx.traverse((child) => {
+        gltf.scene.traverse((child) => {
           if (child.isMesh) {
             child.material = new THREE.ShaderMaterial({
               vertexShader: coinVertexShader,
@@ -583,9 +583,9 @@ export class CoinPixelBlastEffect {
             child.receiveShadow = false
           }
         })
-        
-        this.scene.add(fbx)
-        console.log('Coin loaded and added to scene', fbx)
+
+        this.scene.add(gltf.scene)
+        console.log('Coin loaded and added to scene', gltf.scene)
       },
       (progress) => {
         console.log(`Loading coin: ${progress.loaded / progress.total * 100}%`)
@@ -615,22 +615,46 @@ export class CoinPixelBlastEffect {
   
   onResize() {
     if (this.disposed) return
-    
+
     const width = this.container.clientWidth || this.width
     const height = this.container.clientHeight || this.height
-    
-    this.camera.aspect = width / height
+
+    // Update camera aspect ratio to prevent distortion
+    const aspect = width / height
+    const frustumSize = 2
+    this.camera.left = -frustumSize * aspect / 2
+    this.camera.right = frustumSize * aspect / 2
+    this.camera.top = frustumSize / 2
+    this.camera.bottom = -frustumSize / 2
     this.camera.updateProjectionMatrix()
-    
+
+    // Update renderer size
     this.renderer.setSize(width, height)
-    
-    // Update background resolution
+
+    // Update background plane geometry to match new aspect ratio
+    if (this.bgQuad) {
+      this.bgQuad.geometry.dispose()
+      this.bgQuad.geometry = new THREE.PlaneGeometry(2 * aspect, 2)
+    }
+
+    // Update background resolution and pixel size
     const uniforms = this.bgMaterial.uniforms
     uniforms.uResolution.value.set(
       this.renderer.domElement.width,
       this.renderer.domElement.height
     )
     uniforms.uPixelSize.value = this.config.pixelSize * this.renderer.getPixelRatio()
+
+    // Update coin shader uniforms
+    if (this.coin) {
+      this.coin.traverse((child) => {
+        if (child.isMesh && child.material.uniforms) {
+          if (child.material.uniforms.u_resolution) {
+            child.material.uniforms.u_resolution.value.set(width, height)
+          }
+        }
+      })
+    }
   }
   
   animate() {
