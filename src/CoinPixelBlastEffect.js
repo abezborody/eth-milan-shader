@@ -119,7 +119,9 @@ void main(){
   float cellPixelSize = 8.0 * pixelSize;
   vec2 cellId = floor(fragCoord / cellPixelSize);
   vec2 cellCoord = cellId * cellPixelSize;
-  vec2 uv = cellCoord / uResolution * vec2(aspectRatio, 1.0);
+  // Compensate for aspect ratio in UV coordinates
+  vec2 uv = cellCoord / uResolution;
+  uv.x *= aspectRatio;
 
   float base = fbm2(uv, uTime * 0.05);
   base = base * 0.5 - 0.65;
@@ -136,7 +138,8 @@ void main(){
       vec2 pos = uClickPos[i];
       if (pos.x < 0.0) continue;
       float cellPixelSize = 8.0 * pixelSize;
-      vec2 cuv = (((pos - uResolution * .5 - cellPixelSize * .5) / (uResolution))) * vec2(aspectRatio, 1.0);
+      vec2 cuv = (pos - uResolution * .5 - cellPixelSize * .5) / uResolution;
+      cuv.x *= aspectRatio;
       float t = max(uTime - uClickTimes[i], 0.0);
       float r = distance(uv, cuv);
       float waveR = speed * t;
@@ -447,8 +450,8 @@ export class CoinPixelBlastEffect {
   
   createPixelBlastBackground() {
     // Create background plane positioned behind the coin
-    const aspect = this.width / this.height
-    const geometry = new THREE.PlaneGeometry(2 * aspect, 2)
+    // Plane geometry should cover the full view frustum in NDC (-1 to 1)
+    const geometry = new THREE.PlaneGeometry(2, 2)
     
     // Initialize click arrays
     const clickPositions = []
@@ -598,14 +601,18 @@ export class CoinPixelBlastEffect {
   
   setupMouseInteraction() {
     const canvas = this.renderer.domElement
-    
+
     canvas.addEventListener('pointerdown', (e) => {
       const rect = canvas.getBoundingClientRect()
-      const scaleX = canvas.width / rect.width
-      const scaleY = canvas.height / rect.height
-      const fx = (e.clientX - rect.left) * scaleX
-      const fy = (rect.height - (e.clientY - rect.top)) * scaleY
-      
+
+      // Get normalized coordinates (0 to 1)
+      const nx = (e.clientX - rect.left) / rect.width
+      const ny = 1.0 - (e.clientY - rect.top) / rect.height
+
+      // Convert to canvas pixel coordinates
+      const fx = nx * canvas.width
+      const fy = ny * canvas.height
+
       const uniforms = this.bgMaterial.uniforms
       uniforms.uClickPos.value[this.clickIndex].set(fx, fy)
       uniforms.uClickTimes.value[this.clickIndex] = uniforms.uTime.value
@@ -631,10 +638,10 @@ export class CoinPixelBlastEffect {
     // Update renderer size
     this.renderer.setSize(width, height)
 
-    // Update background plane geometry to match new aspect ratio
+    // Update background plane geometry - always 2x2 in NDC space
     if (this.bgQuad) {
       this.bgQuad.geometry.dispose()
-      this.bgQuad.geometry = new THREE.PlaneGeometry(2 * aspect, 2)
+      this.bgQuad.geometry = new THREE.PlaneGeometry(2, 2)
     }
 
     // Update background resolution and pixel size
