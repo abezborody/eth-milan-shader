@@ -11,21 +11,23 @@ import { CoinDitheringEffect } from './CoinDitheringEffect.js'
 import { CoinPixelBlastEffect } from './CoinPixelBlastEffect.js'
 import * as rive from "@rive-app/canvas";
 
+import { ScrambleText } from './useScrambleText.js'
+
 // Available animation types
 const ANIMATION_TYPES = [
-  // { id: 'ripple', name: 'Ripple', Effect: RippleClickEffect, riveCanvas: true },
   { id: 'ripple-v2', name: 'Ripple', Effect: RippleClickEffectV2, riveCanvas: true },
+  { id: 'coin-pixelblast', name: 'Coin PixelBlast', Effect: CoinPixelBlastEffect, fullscreen: true },
+  // { id: 'ripple', name: 'Ripple', Effect: RippleClickEffect, riveCanvas: true },
   // { id: 'hover-trail-ripple', name: 'Hover Dither Trail Ripple', Effect: HoverTrailRippleEffect },
   // { id: 'ripple-ascii-white', name: 'Ripple ASCII White', Effect: RippleAsciiWhiteEffect },
   // { id: 'hover-trail-white', name: 'Hover Trail White', Effect: HoverTrailAsciiWhiteEffect },
   
-  { id: 'coin-pixelblast', name: 'Coin PixelBlast', Effect: CoinPixelBlastEffect, fullscreen: true },
   // { id: 'dithering-coin', name: 'Dithering Coin', Effect: CoinDitheringEffect, fullscreen: true },
   // { id: 'dithering-copy', name: 'Dithering Waves', Effect: DitheringEffectSimplex, fullscreen: true },
   // { id: 'dithering-image', name: 'Dithering Image', Effect: DitheringImageEffect, fullscreen: true },
 ]
 
-let currentAnimationType = 'ripple'
+let currentAnimationType = 'ripple-v2'
 let effects = []
 
 // Get initial animation type from URL search params
@@ -36,7 +38,7 @@ function getInitialAnimationType() {
   if (typeFromUrl && ANIMATION_TYPES.find(t => t.id === typeFromUrl)) {
     return typeFromUrl
   }
-  return 'ripple'
+  return 'ripple-v2'
 }
 
 function createTabs() {
@@ -138,6 +140,7 @@ currentAnimationType = getInitialAnimationType()
 
 document.querySelector('#app').innerHTML = `
   <div>
+    <h1 class="scramble-title" data-text="ETH MILAN">ETH MILAN</h1>
     ${createTabs()}
     <div class="canvas-container">
       <div id="eth-container"></div>
@@ -171,4 +174,29 @@ async function initRive() {
 }
 
 initRive()
+
+// Initialize scramble text effect
+const titleElement = document.querySelector('.scramble-title')
+if (titleElement) {
+  const titleScrambler = new ScrambleText(titleElement, {
+    text: 'ETH MILAN',
+    speed: 0.8,
+    scramble: 3,
+    tick: 1,
+    step: 2,
+    range: [65, 90], // Uppercase letters only
+    playOnMount: true, // Play animation on page load
+    onAnimationEnd: () => {
+      console.log('Title animation completed')
+    }
+  })
+
+  // Replay animation on hover
+  titleElement.addEventListener('mouseenter', () => {
+    titleScrambler.play()
+  })
+
+  // Add cursor pointer to indicate interactive
+  titleElement.style.cursor = 'pointer'
+}
 
