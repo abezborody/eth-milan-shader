@@ -46,7 +46,21 @@ canvas {
 
 .canvas-container {
   display: flex;
-  justify-content: space-between;
-  max-width: 1280px;
+  gap: 4px;
+  max-width: 100vw;
   /* padding: 0 24px 24px; */
+  align-items: flex-start;
+}
+
+/* Предотвращаем скачки при загрузке эффектов */
+#eth-container,
+#milan-container {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+#rive {
+  flex: 0 0 auto;
+  height: auto;
+  max-width: none;
 }

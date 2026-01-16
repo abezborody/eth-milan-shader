@@ -9,6 +9,8 @@
 - **Оригинальное изображение** отображается под эффектом
 - **Пиксельные частицы** образуют круговые паттерны
 - **Автоматическое угасание** эффекта со временем
+- **Полностью респонсивный** - автоматически адаптируется к размерам контейнера
+- **Динамическая смена изображения** - можно менять картинку на лету
 
 ## Требуемые файлы
 
@@ -61,10 +63,12 @@ https://your-cdn.com/RippleClickEffectV2.js
 <div id="ripple-effect" style="width: 100%; height: 100vh; position: relative;"></div>
 ```
 
-3. Настройте размеры:
+3. Настройте размеры через CSS:
    - Для full-screen эффекта: `height: 100vh`
    - Для фиксированной высоты: `height: 600px` (или любое значение)
    - Для адаптивной ширины: `width: 100%` (уже установлено)
+
+**Важно:** Контейнер должен иметь заданные размеры через CSS. Эффект автоматически определит реальные размеры из `getBoundingClientRect()` и будет адаптироваться при ресайзе окна.
 
 ### Шаг 4: Инициализируйте эффект
 
@@ -81,12 +85,12 @@ https://your-cdn.com/RippleClickEffectV2.js
       // Измените на URL вашего изображения
       const imageUrl = 'https://your-cdn.com/your-image.png';
 
-      // Создаём эффект
+      // Создаём эффект (размеры определяются автоматически из контейнера)
       const rippleEffect = new RippleClickEffectV2(
         container,
         imageUrl,
-        container.clientWidth,
-        container.clientHeight
+        0, // width - теперь определяется автоматически
+        0  // height - теперь определяется автоматически
       );
 
       // Сохраняем ссылку для возможного использования
@@ -145,8 +149,8 @@ rippleEffect.material.uniforms.uRippleIntensity.value = rippleEffect.config.ripp
   const effect = new RippleClickEffectV2(
     container,
     '/assets/logo-white.png', // Путь к логотипу
-    container.clientWidth,
-    container.clientHeight
+    0, // автоматически из контейнера
+    0  // автоматически из контейнера
   );
 
   // Настройки для белого логотипа на черном фоне
@@ -186,14 +190,11 @@ rippleEffect.material.uniforms.uRippleIntensity.value = rippleEffect.config.ripp
   const effect = new RippleClickEffectV2(
     container,
     '/assets/interactive-image.png',
-    container.offsetWidth,
-    container.offsetHeight
+    0, // автоматически из контейнера
+    0  // автоматически из контейнера
   );
 
-  // Обработка изменения размера
-  window.addEventListener('resize', () => {
-    // Эффект автоматически адаптируется при resize
-  });
+  // Эффект автоматически адаптируется при resize - не нужен дополнительный код!
 </script>
 ```
 
@@ -210,11 +211,11 @@ rippleEffect.material.uniforms.uRippleIntensity.value = rippleEffect.config.ripp
 
   // Создаём первый эффект
   const container1 = document.getElementById('ripple-1');
-  effects.push(new RippleClickEffectV2(container1, '/image1.png', container1.clientWidth, container1.clientHeight));
+  effects.push(new RippleClickEffectV2(container1, '/image1.png', 0, 0));
 
   // Создаём второй эффект
   const container2 = document.getElementById('ripple-2');
-  effects.push(new RippleClickEffectV2(container2, '/image2.png', container2.clientWidth, container2.clientHeight));
+  effects.push(new RippleClickEffectV2(container2, '/image2.png', 0, 0));
 
   // Очистка всех эффектов
   window.addEventListener('beforeunload', () => {
@@ -446,8 +447,8 @@ effect.renderer.setPixelRatio(1);
     const effect = new RippleClickEffectV2(
       container,
       'https://your-cdn.com/logo.png',
-      container.clientWidth,
-      container.clientHeight
+      0, // автоматически из контейнера
+      0  // автоматически из контейнера
     );
 
     // Кастомизация
@@ -475,6 +476,68 @@ effect.renderer.setPixelRatio(1);
 ---
 
 ## Дополнительные возможности
+
+### Динамическая смена изображения
+
+Эффект поддерживает динамическую смену изображения на лету:
+
+```javascript
+// Смена изображения (например, при ресайзе окна)
+async function updateImageForScreenSize() {
+  const isMobile = window.innerWidth < 768;
+
+  if (isMobile) {
+    await window.rippleEffect.updateImage('/assets/logo-mobile.png');
+  } else {
+    await window.rippleEffect.updateImage('/assets/logo-desktop.png');
+  }
+}
+
+// Вызываем при ресайзе
+window.addEventListener('resize', () => {
+  updateImageForScreenSize();
+});
+
+// Или при определённом событии
+document.getElementById('change-image-btn').addEventListener('click', () => {
+  window.rippleEffect.updateImage('/assets/new-image.png');
+});
+```
+
+**Пример для респонсивных изображений:**
+
+```html
+<script type="module">
+  import { RippleClickEffectV2 } from 'https://your-cdn.com/RippleClickEffectV2.js';
+
+  const container = document.getElementById('ripple-effect');
+
+  // Выбираем изображение в зависимости от размера экрана
+  const getResponsiveImage = () => {
+    return window.innerWidth < 768
+      ? '/assets/logo-mobile.png'
+      : '/assets/logo-desktop.png';
+  };
+
+  // Создаём эффект
+  const effect = new RippleClickEffectV2(
+    container,
+    getResponsiveImage(),
+    0, 0
+  );
+
+  window.rippleEffect = effect;
+
+  // Обновляем изображение при ресайзе
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      effect.updateImage(getResponsiveImage());
+    }, 250); // Debounce для оптимизации
+  });
+</script>
+```
 
 ### Программный вызов ripple эффекта
 
