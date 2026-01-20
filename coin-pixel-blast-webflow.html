@@ -11,21 +11,11 @@
       box-sizing: border-box;
     }
 
-    body {
-      font-family: Arial, sans-serif;
-      background: #0a0a0a;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
-    }
-
     .coin-blast-container {
       position: relative;
-      width: 100%;
-      max-width: 800px;
-      aspect-ratio: 16 / 9;
+      width: 100vw;
+      height: 800px;
+      overflow: hidden;
     }
 
     .coin-blast-canvas {
@@ -35,6 +25,7 @@
       width: 100%;
       height: 100%;
       cursor: pointer;
+      display: block;
     }
   </style>
 </head>
@@ -404,14 +395,13 @@
             rippleSpeed: 0.4,
             speed: 0.2,
             edgeFade: 0,
-            modelUrl: '/eth-coin.glb.txt', // URL к вашей 3D модели
-            width: 800,
-            height: 450,
+            modelUrl: '/eth-coin.glb.txt',
             ...options
           };
 
-          this.width = this.config.width;
-          this.height = this.config.height;
+          // Get container dimensions
+          this.width = this.container.clientWidth;
+          this.height = this.container.clientHeight;
 
           this.init();
         }
